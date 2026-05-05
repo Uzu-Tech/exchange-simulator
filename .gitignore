@@ -1,0 +1,27 @@
+# --- Build Artifacts ---
+build/
+bin/
+out/
+*.o
+*.a
+*.so
+*.exe
+*.out
+
+# --- VS Code & IDEs ---
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/settings.json
+.history/
+*.log
+
+# --- CMake generated files ---
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/ ;
+cmake_install.cmake
+Makefile
+
+# --- Test Artifacts ---
+tests/build/
