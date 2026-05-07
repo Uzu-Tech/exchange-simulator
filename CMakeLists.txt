@@ -8,6 +8,7 @@ include_directories(include)
 
 add_executable(exch-sim 
     src/main.cpp
+    src/orderbook.cpp
 )
 target_include_directories(exch-sim PRIVATE include)
 
