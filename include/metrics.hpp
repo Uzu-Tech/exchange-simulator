@@ -8,13 +8,14 @@ concept Numeric = (std::floating_point<T> || std::integral<T>)
 
 template<Numeric T>
 struct Metric {
-    T value_;
     T total_;
     double mean_ = 0.0;
     double sum_sq_diffs_ = 0.0; 
     int n = 0;
 
-    Metric(T val) : value(value) {};
+    Metric() = default;
+    explicit Metric(T initial) { update(initial); }
+    
     void update(T val) {
         n++;
         total_ += val;
@@ -29,7 +30,7 @@ struct Metric {
     T total() const { return total_; }
     double mean() const { return mean_; }
     double variance() const {
-        return (n >= 2) ? (m2_ / (n - 1)) : 0.0;
+        return (n >= 2) ? (sum_sq_diffs_ / (n - 1)) : 0.0;
     }
     double std_dev() const {
         return std::sqrt(variance());

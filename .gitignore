@@ -16,6 +16,7 @@ exch-sim
 !.vscode/settings.json
 .history/
 *.log
+.cache
 
 # --- CMake generated files ---
 CMakeCache.txt

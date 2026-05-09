@@ -16,7 +16,7 @@ public:
         std::mt19937_64& gen
     ) : current_price(start_price), step(step), gen(gen), dist(p) {}
 
-    double next_price() {
+    double next_price() noexcept {
         current_price += (2 * dist(gen) - 1) * step;
         return current_price;
     }
@@ -38,7 +38,7 @@ public:
         std::mt19937_64& gen
     ) : current_price(start_price), gen(gen), dist(drift, std_dev) {}
 
-    double next_price() {
+    double next_price() noexcept {
         current_price += dist(gen);
         return current_price;
     }
