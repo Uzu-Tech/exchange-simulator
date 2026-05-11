@@ -1,10 +1,10 @@
 #pragma once
 
-#include "types.hpp"
+#include "strong_types.hpp"
 
 struct Trade {
     Price price;
     Volume volume;
-    OrderId buyer_id;
-    OrderId seller_id;
+    TraderId  buyer_id;
+    TraderId  seller_id;
 };

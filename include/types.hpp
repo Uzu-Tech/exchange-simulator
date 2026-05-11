@@ -5,7 +5,7 @@
 #include <vector>
 
 struct BookOrder {
-    OrderId id;
+    TraderId  id;
     Volume volume;
 };
 
@@ -52,21 +52,21 @@ enum class OrderType {
 };
 
 struct OrderRequest {
-    OrderId id;
+    TraderId  id;
     OrderType type;
     Price price;
     Volume volume;
     Side side;
 
-    static OrderRequest limit(OrderId id, Price price, Volume volume, Side side) {
+    static OrderRequest limit(TraderId  id, Price price, Volume volume, Side side) {
         return OrderRequest(id, OrderType::LIMIT, price, volume, side);
     }
 
-    static OrderRequest market(OrderId id, Volume volume, Side side) {
+    static OrderRequest market(TraderId  id, Volume volume, Side side) {
         return OrderRequest(id, OrderType::MARKET, Price{0}, volume, side);
     }
 
 private:
-    OrderRequest(OrderId id, OrderType type, Price price, Volume volume, Side side)
+    OrderRequest(TraderId  id, OrderType type, Price price, Volume volume, Side side)
         : id(id), type(type), price(price), volume(volume), side(side) {}
 };

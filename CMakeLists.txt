@@ -4,24 +4,24 @@ project(ExchangeSimulator)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include_directories(include)
-
-add_executable(exch-sim 
+add_executable(exch-sim
     src/main.cpp
 )
 target_include_directories(exch-sim PRIVATE include)
+target_include_directories(exch-sim SYSTEM PRIVATE include/external/pcg)
 
 enable_testing()
 
 find_package(GTest REQUIRED)
-include_directories(${GTEST_INCLUDE_DIRS})
 
-add_executable(tests 
+add_executable(tests
     tests/test_strategy.cpp
     tests/test_price_models.cpp
-    tests/test_matching.cpp 
+    tests/test_matching.cpp
+    tests/test_maker.cpp
 )
 target_link_libraries(tests PRIVATE GTest::gtest_main)
 target_include_directories(tests PRIVATE include)
+target_include_directories(tests SYSTEM PRIVATE include/external/pcg)
 
 add_test(NAME ALL_TESTS COMMAND tests)

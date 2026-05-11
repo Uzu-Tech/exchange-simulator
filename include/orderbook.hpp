@@ -46,7 +46,7 @@ public:
             order_rq.volume -= trade_vol;
             best_level.total_volume -= trade_vol;
 
-            OrderId buyer{0}, seller{0};
+            TraderId  buyer{0}, seller{0};
             if constexpr (S == Side::BID) {
                 seller = order_rq.id;
                 buyer  = market_order.id;
