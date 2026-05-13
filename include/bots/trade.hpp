@@ -1,6 +1,6 @@
 #pragma once
 
-#include "strong_types.hpp"
+#include "primitives.hpp"
 
 struct Trade {
     Price price;

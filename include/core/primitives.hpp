@@ -27,7 +27,7 @@ inline void hard_assert(
 struct TraderId  {
 public:
     using Underlying = uint64_t;
-    explicit TraderId (Underlying v) : value(v) {}
+    constexpr explicit TraderId (Underlying v) : value(v) {}
     // Comparision
     auto operator<=>(const TraderId &) const = default;
 private:
@@ -112,6 +112,7 @@ public:
     explicit Position(Underlying v): value_(v) {}
     // Comparision
     auto operator<=>(const Position&) const = default;
+    const Underlying value() const { return value_; }
 
     Position operator+(const Volume& v) const {
         int64_t res = static_cast<int64_t>(value_) + v.value();
@@ -128,4 +129,30 @@ public:
 
 private:
     Underlying value_ = 0;
+};
+
+class PositionLimit {
+public:
+    using Underlying = uint32_t;
+
+    PositionLimit() = default;
+    explicit PositionLimit(Underlying v) : value_(v) {}
+
+    // Is the position within [-limit, +limit]
+    bool contains(Position pos) const noexcept {
+        return std::abs(pos.value()) <= static_cast<Wide>(value_);
+    }
+
+    Volume remaining_long(Position pos) const noexcept {
+        Wide remaining = static_cast<Wide>(value_) - pos.value();
+        return Volume{static_cast<Volume::Underlying>(std::max(remaining, Wide{0}))};
+    }
+
+    Volume remaining_short(Position pos) const noexcept {
+        Wide remaining = static_cast<Wide>(value_) + pos.value();
+        return Volume{static_cast<Volume::Underlying>(std::max(remaining, Wide{0}))};
+    }
+
+private:
+    Underlying value_;
 };

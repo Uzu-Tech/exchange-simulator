@@ -1,12 +1,12 @@
 #include <gtest/gtest.h>
 
 #include "orderbook.hpp"
-#include "strong_types.hpp"
-#include "types.hpp"
+#include "primitives.hpp"
+#include "market_types.hpp"
 
 class OrderBookTest : public ::testing::Test {
 protected:
-    OrderBook book{16};
+    OrderBook book;
 
     void TearDown() override {
         book.clear();
