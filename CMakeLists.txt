@@ -14,6 +14,7 @@ target_include_directories(exch-sim PRIVATE
     include/sim 
     include/model
 )
+target_include_directories(exch-sim PRIVATE strategy)
 target_include_directories(exch-sim SYSTEM PRIVATE include/external/pcg)
 
 enable_testing()
@@ -34,6 +35,7 @@ target_include_directories(tests PRIVATE
     include/sim 
     include/model
 )
+target_include_directories(tests PRIVATE strategy)
 target_include_directories(tests SYSTEM PRIVATE include/external/pcg)
 
 add_test(NAME ALL_TESTS COMMAND tests)

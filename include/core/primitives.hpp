@@ -156,3 +156,20 @@ public:
 private:
     Underlying value_;
 };
+
+template<unsigned int TickSize>
+class Timestamp {
+public:
+    using Underlying = Wide;
+    Timestamp() = default;
+    explicit Timestamp(Underlying v) : value_(v) {}
+
+    auto operator<=>(const Timestamp&) const = default;
+    Timestamp<TickSize>& operator++() {
+        value_ += static_cast<Underlying>(TickSize);
+        return Timestamp<TickSize>{value_};
+    }
+
+private:
+    Underlying value_;
+};
