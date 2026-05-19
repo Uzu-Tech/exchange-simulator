@@ -7,11 +7,14 @@
 #include <optional>
 #include <random>
 #include <pcg_random.hpp>
+#include "sim_price.hpp"
 
-template<typename T>
-concept Taker = requires(T taker, const OrderBook& order_book, double sim_price) {
-    {taker.get_order(order_book, sim_price)} -> std::same_as<std::optional<OrderRequest>>;
-};
+template<typename T, typename Model>
+concept MarketTaker = 
+    PriceModel<Model> &&
+    requires(T taker, const OrderBook& order_book, const Model& model) {
+        {taker.get_order(order_book, model)} -> std::same_as<std::optional<OrderRequest>>;
+    };
 
 class RandomTaker {
 public:
@@ -24,9 +27,13 @@ public:
     )
         : id(id), trade_arrival(trade_prob), volume_dist(min_volume.value(), max_volume.value()), gen(gen) {}
 
-    std::optional<OrderRequest> get_order(const OrderBook& order_book, double sim_price) {
+    std::optional<OrderRequest> get_order(const OrderBook& order_book, const PriceModel auto& model) {
         if (trade_arrival(gen)) [[unlikely]] {
-            return OrderRequest::market(id, Volume{volume_dist(gen)}, (side_dist(gen))? Side::BID : Side::ASK);
+            return OrderRequest::market(
+                id, 
+                Volume{volume_dist(gen)}, 
+                (side_dist(gen))? Side::BID : Side::ASK
+            );
         }
         return std::nullopt;
     }

@@ -6,6 +6,7 @@
 #include <optional>
 #include <random>
 #include <pcg_random.hpp>
+#include "sim_price.hpp"
 
 struct MakerQuote {
     std::optional<OrderRequest> bid;
@@ -17,10 +18,12 @@ struct MakerQuote {
     }
 };
 
-template<typename T>
-concept MarketMaker = requires(T maker, double sim_price) {
-    {maker.make_market(sim_price)} -> std::same_as<MakerQuote>;
-};
+template<typename T, typename Model> 
+concept MarketMaker = 
+    PriceModel<Model> && 
+    requires(T maker, const Model &model) {
+        { maker.make_market(model) } -> std::same_as<MakerQuote>;
+    };
 
 class SymmetricMaker {
 public:
@@ -33,8 +36,8 @@ public:
     ) 
         : id(id), half_spread(half_spread), volume_dist(min_volume.value(), max_volume.value()), gen(gen) {}
 
-    MakerQuote make_market(double sim_price) {
-        Price mid_price = convert_type_to_price(sim_price);
+    MakerQuote make_market(const PriceModel auto& model) {
+        Price mid_price = convert_double_to_price(model.current_price());
 
         Price bid_price = mid_price - half_spread;
         Price ask_price = mid_price + half_spread;

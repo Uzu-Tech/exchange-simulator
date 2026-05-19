@@ -26,6 +26,9 @@ add_executable(tests
     tests/test_matching.cpp
     tests/test_maker.cpp
     tests/test_taker.cpp
+    tests/test_simulator.cpp
+    tests/test_simulator_run.cpp
+    tests/test_strategy.cpp
 )
 target_link_libraries(tests PRIVATE GTest::gtest_main)
 target_include_directories(tests PRIVATE 

@@ -5,7 +5,7 @@
 
 template<typename T>
 concept PriceModel = requires(T model) {
-    {model.next_price()} -> std::same_as<double>;
+    {model.next_price()} -> std::same_as<void>;
     {model.current_price()} -> std::same_as<double>;
 };
 
@@ -18,9 +18,8 @@ public:
         pcg32 gen
     ) : current_price_(start_price), step(step), gen(gen), dist(p) {}
 
-    const double next_price() noexcept {
+    void next_price() noexcept {
         current_price_ += (2 * dist(gen) - 1) * step;
-        return current_price_;
     }
 
     double current_price() const noexcept { return current_price_; }
@@ -42,9 +41,8 @@ public:
         pcg32 gen
     ) : current_price_(start_price), gen(gen), dist(drift, std_dev) {}
 
-    double next_price() noexcept {
+    void next_price() noexcept {
         current_price_ += dist(gen);
-        return current_price_;
     }
 
     double current_price() const noexcept { return current_price_; }

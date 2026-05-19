@@ -1,5 +1,5 @@
-#include <iostream>
+#include "simulator.hpp"
 
 int main() {
-    std::cout << "Running exchange simulator\n";
+    
 }

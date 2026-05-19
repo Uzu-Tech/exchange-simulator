@@ -20,12 +20,12 @@ TEST_F(OrderBookTest, AddsBidLimitOrder) {
 
     auto bids = book.bids();
 
-    ASSERT_EQ(bids.size(), 1);
-    EXPECT_EQ(bids[0].price,        Price{100});
-    EXPECT_EQ(bids[0].total_volume, Volume{10});
+    ASSERT_EQ(bids.view().size(), 1);
+    EXPECT_EQ(bids.view()[0].price,        Price{100});
+    EXPECT_EQ(bids.view()[0].volume, Volume{10});
 
-    ASSERT_EQ(bids[0].orders.size(), 1);
-    EXPECT_EQ(bids[0].orders.front().id, TraderId {1});
+    ASSERT_EQ(bids.view()[0].orders.size(), 1);
+    EXPECT_EQ(bids.view()[0].orders.front().id, TraderId {1});
 }
 
 TEST_F(OrderBookTest, AddsAskLimitOrder) {
@@ -35,9 +35,9 @@ TEST_F(OrderBookTest, AddsAskLimitOrder) {
 
     auto asks = book.asks();
 
-    ASSERT_EQ(asks.size(), 1);
-    EXPECT_EQ(asks[0].price,        Price{105});
-    EXPECT_EQ(asks[0].total_volume, Volume{7});
+    ASSERT_EQ(asks.view().size(), 1);
+    EXPECT_EQ(asks.view()[0].price,        Price{105});
+    EXPECT_EQ(asks.view()[0].volume, Volume{7});
 }
 
 TEST_F(OrderBookTest, AggregatesOrdersAtSamePrice) {
@@ -49,12 +49,12 @@ TEST_F(OrderBookTest, AggregatesOrdersAtSamePrice) {
 
     auto bids = book.bids();
 
-    ASSERT_EQ(bids.size(), 1);
-    EXPECT_EQ(bids[0].total_volume, Volume{13});
+    ASSERT_EQ(bids.view().size(), 1);
+    EXPECT_EQ(bids.view()[0].volume, Volume{13});
 
-    ASSERT_EQ(bids[0].orders.size(), 2);
-    EXPECT_EQ(bids[0].orders[0].id, TraderId {1});
-    EXPECT_EQ(bids[0].orders[1].id, TraderId {2});
+    ASSERT_EQ(bids.view()[0].orders.size(), 2);
+    EXPECT_EQ(bids.view()[0].orders[0].id, TraderId {1});
+    EXPECT_EQ(bids.view()[0].orders[1].id, TraderId {2});
 }
 
 TEST_F(OrderBookTest, BidCrossesAskAndTrades) {
@@ -64,8 +64,8 @@ TEST_F(OrderBookTest, BidCrossesAskAndTrades) {
     book.add_order(ask);
     book.add_order(bid);
 
-    EXPECT_TRUE(book.asks().empty());
-    EXPECT_TRUE(book.bids().empty());
+    EXPECT_TRUE(book.asks().view().empty());
+    EXPECT_TRUE(book.bids().view().empty());
 
     auto trades = book.trades();
 
@@ -85,8 +85,8 @@ TEST_F(OrderBookTest, PartialFillLeavesRemainingLiquidity) {
 
     auto asks = book.asks();
 
-    ASSERT_EQ(asks.size(), 1);
-    EXPECT_EQ(asks[0].orders.front().volume, Volume{6});
+    ASSERT_EQ(asks.view().size(), 1);
+    EXPECT_EQ(asks.view()[0].orders.front().volume, Volume{6});
 
     auto trades = book.trades();
 
@@ -105,10 +105,10 @@ TEST_F(OrderBookTest, FIFOIsRespected) {
 
     auto asks = book.asks();
 
-    ASSERT_EQ(asks.size(), 1);
-    ASSERT_EQ(asks[0].orders.size(), 1);
-    EXPECT_EQ(asks[0].orders.front().id,     TraderId {2});
-    EXPECT_EQ(asks[0].orders.front().volume, Volume{3});
+    ASSERT_EQ(asks.view().size(), 1);
+    ASSERT_EQ(asks.view()[0].orders.size(), 1);
+    EXPECT_EQ(asks.view()[0].orders.front().id,     TraderId {2});
+    EXPECT_EQ(asks.view()[0].orders.front().volume, Volume{3});
 }
 
 TEST_F(OrderBookTest, MarketOrderConsumesLiquidity) {
@@ -118,7 +118,7 @@ TEST_F(OrderBookTest, MarketOrderConsumesLiquidity) {
     book.add_order(ask);
     book.add_order(market_bid);
 
-    EXPECT_TRUE(book.asks().empty());
+    EXPECT_TRUE(book.asks().view().empty());
 
     auto trades = book.trades();
 
@@ -132,8 +132,8 @@ TEST_F(OrderBookTest, MarketOrderDoesNotRestOnBook) {
 
     book.add_order(market_bid);
 
-    EXPECT_TRUE(book.bids().empty());
-    EXPECT_TRUE(book.asks().empty());
+    EXPECT_TRUE(book.bids().view().empty());
+    EXPECT_TRUE(book.asks().view().empty());
 }
 
 TEST_F(OrderBookTest, MarketOrderPartialFillEmptyBook) {
@@ -144,8 +144,8 @@ TEST_F(OrderBookTest, MarketOrderPartialFillEmptyBook) {
     book.add_order(market_bid);
 
     // Liquidity exhausted — remaining 5 volume unmatched, nothing rests
-    EXPECT_TRUE(book.asks().empty());
-    EXPECT_TRUE(book.bids().empty());
+    EXPECT_TRUE(book.asks().view().empty());
+    EXPECT_TRUE(book.bids().view().empty());
 
     auto trades = book.trades();
 
@@ -164,7 +164,7 @@ TEST_F(OrderBookTest, NonCrossingOrdersRemainOnBook) {
     book.add_order(bid);
     book.add_order(ask);
 
-    EXPECT_EQ(book.bids().size(), 1);
-    EXPECT_EQ(book.asks().size(), 1);
+    EXPECT_EQ(book.bids().view().size(), 1);
+    EXPECT_EQ(book.asks().view().size(), 1);
     EXPECT_TRUE(book.trades().empty());
 }

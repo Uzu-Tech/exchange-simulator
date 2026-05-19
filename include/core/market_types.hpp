@@ -1,6 +1,8 @@
 #pragma once
 
 #include "primitives.hpp"
+#include "config.hpp"
+#include <span>
 #include <initializer_list>
 #include <vector>
 
@@ -77,6 +79,12 @@ private:
 
 struct PriceLevel {
     Price price;
-    Volume total_volume;
+    Volume volume;
     OrderQueue orders; // FIFO for orders
+};
+
+struct TradingState {
+    Timestamp<config::TIMESTAMP_TICK_SIZE> timestamp;
+    std::span<const Trade> prev_trades;
+    Position position;
 };

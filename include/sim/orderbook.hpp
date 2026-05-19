@@ -1,7 +1,9 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 #include <span>
+#include <ranges>
 #include <algorithm>
 #include "config.hpp"
 #include "primitives.hpp"
@@ -22,9 +24,20 @@ public:
         levels.reserve(config::ORDER_BOOK_DEPTH);
     }
 
-    std::span<const PriceLevel> view() const noexcept {
-        return levels;
+    auto view() const noexcept {
+        return levels | std::views::reverse;
     }
+
+    std::optional<PriceLevel> best() const {
+        return (levels.empty()) ? 
+        std::optional<PriceLevel>{std::nullopt} : levels.back();
+    }
+
+    std::optional<PriceLevel> worst() const {
+        return (levels.empty()) ? 
+        std::optional<PriceLevel>{std::nullopt} : levels.front();
+    }
+
 
     bool crosses_best_price(Price incoming) const {
         if (levels.empty()) return false;
@@ -35,7 +48,9 @@ public:
             return incoming >= levels.back().price;
     }
 
-    void match_opposing_order(OrderRequest& order_rq, std::vector<Trade>& trades) {
+    std::span<const Trade> match_opposing_order(OrderRequest& order_rq, std::vector<Trade>& trades) {
+        size_t prev_trade_size = trades.size();
+
         while (
             order_rq.volume > Volume{0} 
             && !levels.empty() 
@@ -49,6 +64,8 @@ public:
             trades.push_back(get_trade(best_level.price, trade_vol, order_rq.id));
             remove_if_filled(best_level);
         }
+        // new trades
+        return std::span<const Trade>(trades.begin() + prev_trade_size, trades.end());
     }
 
     void place_like_order(const OrderRequest& order_rq) {
@@ -66,7 +83,7 @@ public:
 
         if (rev_it != levels.rend() && rev_it->price == order_rq.price) {
             rev_it->orders.push_back(new_order);
-            rev_it->total_volume += order_rq.volume;
+            rev_it->volume += order_rq.volume;
             return;
         }
 
@@ -83,7 +100,7 @@ private:
         Volume trade_vol = std::min(taker_vol, market_order.volume);
         market_order.volume -= trade_vol;
         taker_vol -= trade_vol;
-        level.total_volume -= trade_vol;
+        level.volume -= trade_vol;
         return trade_vol;
     }
 
@@ -122,16 +139,16 @@ class OrderBook {
 public:
     OrderBook() = default;
 
-    void add_order(OrderRequest& order_rq) {
+    std::span<const Trade> add_order(OrderRequest& order_rq) {
         if (order_rq.side == Side::BID)
-            add_side<Side::BID>(order_rq);
+            return add_side<Side::BID>(order_rq);
         else
-            add_side<Side::ASK>(order_rq);
+            return add_side<Side::ASK>(order_rq);
     }
 
     std::span<const Trade> trades() const noexcept { return trades_; }
-    std::span<const PriceLevel> bids() const noexcept { return bids_.view(); }
-    std::span<const PriceLevel> asks() const noexcept { return asks_.view(); }
+    auto& bids() const noexcept { return bids_; }
+    auto& asks() const noexcept { return asks_; }
 
     void clear() {
         bids_.clear();
@@ -151,11 +168,12 @@ private:
     }
 
     template<Side S>
-    void add_side(OrderRequest& order_rq) {
+    std::span<const Trade> add_side(OrderRequest& order_rq) {
         OrderDepth<S>& own_depth = depth<S>();
         OrderDepth<detail::opposite<S>()>& cross_depth = depth<detail::opposite<S>()>();
 
-        cross_depth.match_opposing_order(order_rq, trades_);
+        auto new_trades = cross_depth.match_opposing_order(order_rq, trades_);
         own_depth.place_like_order(order_rq);
+        return new_trades;
     }
 };
