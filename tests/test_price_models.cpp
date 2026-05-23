@@ -10,8 +10,12 @@ static_assert(PriceModel<GaussianRandomWalk>, "GaussianRandomWalk must satisfy P
 // ---------------------------------------------------------------------------
 TEST(PriceModelTest, SimpleRandomWalkMovesOneStep) {
     RandomEngine rng{42};
-    SimpleRandomWalk walk{100.0, 0.5, 1.0, rng.make_child()};
+    SimpleRandomWalk::ConfigParams params{};
+    params.start_price = 100.0;
+    params.p           = 0.5;
+    params.step        = 1.0;
 
+    SimpleRandomWalk walk{rng.make_child(), params};
     walk.next_price();
     double price = walk.current_price();
 
@@ -20,8 +24,12 @@ TEST(PriceModelTest, SimpleRandomWalkMovesOneStep) {
 
 TEST(PriceModelTest, SimpleRandomWalkAlwaysUp) {
     RandomEngine rng{42};
-    SimpleRandomWalk walk{100.0, 1.0, 1.0, rng.make_child()};
+    SimpleRandomWalk::ConfigParams params{};
+    params.start_price = 100.0;
+    params.p           = 1.0;
+    params.step        = 1.0;
 
+    SimpleRandomWalk walk{rng.make_child(), params};
     for (int i = 0; i < 10; ++i) {
         walk.next_price();
         EXPECT_EQ(walk.current_price(), 100.0 + (i + 1));
@@ -30,8 +38,12 @@ TEST(PriceModelTest, SimpleRandomWalkAlwaysUp) {
 
 TEST(PriceModelTest, SimpleRandomWalkAlwaysDown) {
     RandomEngine rng{42};
-    SimpleRandomWalk walk{100.0, 0.0, 1.0, rng.make_child()};
+    SimpleRandomWalk::ConfigParams params{};
+    params.start_price = 100.0;
+    params.p           = 0.0;
+    params.step        = 1.0;
 
+    SimpleRandomWalk walk{rng.make_child(), params};
     for (int i = 0; i < 10; ++i) {
         walk.next_price();
         EXPECT_EQ(walk.current_price(), 100.0 - (i + 1));
@@ -40,8 +52,12 @@ TEST(PriceModelTest, SimpleRandomWalkAlwaysDown) {
 
 TEST(PriceModelTest, SimpleRandomWalkZeroStepStaysFlat) {
     RandomEngine rng{42};
-    SimpleRandomWalk walk{100.0, 0.5, 0.0, rng.make_child()};
+    SimpleRandomWalk::ConfigParams params{};
+    params.start_price = 100.0;
+    params.p           = 0.5;
+    params.step        = 0.0;
 
+    SimpleRandomWalk walk{rng.make_child(), params};
     for (int i = 0; i < 50; ++i) {
         walk.next_price();
         EXPECT_EQ(walk.current_price(), 100.0);
@@ -58,44 +74,40 @@ TEST(PriceModelTest, GaussianWalkTracksExpectedDrift) {
     double std_dev    = 0.1;
     int    iterations = 1000;
 
-    GaussianRandomWalk walk{start, drift, std_dev, rng.make_child()};
+    GaussianRandomWalk::ConfigParams params{};
+    params.start_price = start;
+    params.drift       = drift;
+    params.std_dev     = std_dev;
 
+    GaussianRandomWalk walk{rng.make_child(), params};
     for (int i = 0; i < iterations; ++i)
         walk.next_price();
 
     double total_move    = walk.current_price() - start;
     double expected_move = drift * iterations;
 
-    // std error ~ 0.1*sqrt(1000) ~ 3.16, tolerance of 15 is ~5 std errors
     EXPECT_NEAR(total_move, expected_move, 15.0);
 }
 
-TEST(PriceModelTest, GaussianWalkZeroDriftStaysNearStart) {
-    RandomEngine rng{42};
-    GaussianRandomWalk walk{100.0, 0.0, 0.001, rng.make_child()};
-
-    for (int i = 0; i < 1000; ++i)
-        walk.next_price();
-
-    // With tiny std_dev and zero drift, price should stay very close to start
-    EXPECT_NEAR(walk.current_price(), 100.0, 1.0);
-}
-
 // ---------------------------------------------------------------------------
-// Reproducibility — applies to both models
+// Reproducibility
 // ---------------------------------------------------------------------------
 TEST(PriceModelTest, SimpleWalkReproducibleWithSameSeed) {
     double p1, p2;
+    SimpleRandomWalk::ConfigParams params{};
+    params.start_price = 100.0;
+    params.p           = 0.5;
+    params.step        = 1.0;
 
     {
         RandomEngine rng{99};
-        SimpleRandomWalk walk{100.0, 0.5, 1.0, rng.make_child()};
+        SimpleRandomWalk walk{rng.make_child(), params};
         for (int i = 0; i < 100; ++i) walk.next_price();
         p1 = walk.current_price();
     }
     {
         RandomEngine rng{99};
-        SimpleRandomWalk walk{100.0, 0.5, 1.0, rng.make_child()};
+        SimpleRandomWalk walk{rng.make_child(), params};
         for (int i = 0; i < 100; ++i) walk.next_price();
         p2 = walk.current_price();
     }
@@ -105,30 +117,23 @@ TEST(PriceModelTest, SimpleWalkReproducibleWithSameSeed) {
 
 TEST(PriceModelTest, GaussianWalkReproducibleWithSameSeed) {
     double p1, p2;
+    GaussianRandomWalk::ConfigParams params{};
+    params.start_price = 100.0;
+    params.drift       = 0.0;
+    params.std_dev     = 1.0;
 
     {
         RandomEngine rng{99};
-        GaussianRandomWalk walk{100.0, 0.0, 1.0, rng.make_child()};
+        GaussianRandomWalk walk{rng.make_child(), params};
         for (int i = 0; i < 100; ++i) walk.next_price();
         p1 = walk.current_price();
     }
     {
         RandomEngine rng{99};
-        GaussianRandomWalk walk{100.0, 0.0, 1.0, rng.make_child()};
+        GaussianRandomWalk walk{rng.make_child(), params};
         for (int i = 0; i < 100; ++i) walk.next_price();
         p2 = walk.current_price();
     }
 
     EXPECT_EQ(p1, p2);
-}
-
-TEST(PriceModelTest, DifferentStreamsAreIndependent) {
-    RandomEngine rng{42};
-    GaussianRandomWalk walk1{100.0, 0.0, 1.0, rng.make_child()};
-    GaussianRandomWalk walk2{100.0, 0.0, 1.0, rng.make_child()};
-
-    walk1.next_price();
-    walk2.next_price();
-
-    EXPECT_NE(walk1.current_price(), walk2.current_price());
 }

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "market_types.hpp"
 #include <vector>
 #include "orderbook.hpp"
@@ -9,7 +11,8 @@ concept Strategy = requires(
     T strategy, 
     const TradingState& state, 
     const OrderBook& orderbook,
-    PositionLimit position_limit
+    PositionLimit position_limit,
+    std::vector<OrderRequest>& orders
 ) {
-    {strategy.get_orders(state, orderbook, position_limit)} -> std::same_as<std::vector<OrderRequest>>;
+    {strategy.get_orders(state, orderbook, position_limit, orders)} -> std::same_as<void>;
 };

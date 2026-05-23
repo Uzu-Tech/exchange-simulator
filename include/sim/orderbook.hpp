@@ -1,43 +1,38 @@
 #pragma once
 
-#include <optional>
-#include <vector>
-#include <span>
-#include <ranges>
 #include <algorithm>
+#include <ranges>
+#include <span>
+#include <vector>
+
 #include "config.hpp"
-#include "primitives.hpp"
 #include "market_types.hpp"
+#include "primitives.hpp"
 
 namespace detail {
-    template<Side S>
-    constexpr Side opposite() {
-        if constexpr (S == Side::BID) return Side::ASK;
-        else return Side::BID;
-    }
+template<Side S>
+constexpr Side opposite() {
+    if constexpr (S == Side::BID)
+        return Side::ASK;
+    else
+        return Side::BID;
 }
+}  // namespace detail
 
 template<Side S>
 class OrderDepth {
 public:
-    OrderDepth() {
-        levels.reserve(config::ORDER_BOOK_DEPTH);
+    OrderDepth() { levels.reserve(config::INITIAL_ORDER_BOOK_DEPTH); }
+
+    auto view() const noexcept { return levels | std::views::reverse; }
+
+    const PriceLevel* best() const {
+        return (levels.empty()) ? nullptr : &levels.back();
     }
 
-    auto view() const noexcept {
-        return levels | std::views::reverse;
+    const PriceLevel* worst() const {
+        return (levels.empty()) ? nullptr : &levels.front();
     }
-
-    std::optional<PriceLevel> best() const {
-        return (levels.empty()) ? 
-        std::optional<PriceLevel>{std::nullopt} : levels.back();
-    }
-
-    std::optional<PriceLevel> worst() const {
-        return (levels.empty()) ? 
-        std::optional<PriceLevel>{std::nullopt} : levels.front();
-    }
-
 
     bool crosses_best_price(Price incoming) const {
         if (levels.empty()) return false;
@@ -48,19 +43,18 @@ public:
             return incoming >= levels.back().price;
     }
 
-    std::span<const Trade> match_opposing_order(OrderRequest& order_rq, std::vector<Trade>& trades) {
+    std::span<const Trade> match_opposing_order(
+        OrderRequest& order_rq,
+        std::vector<Trade>& trades
+    ) {
         size_t prev_trade_size = trades.size();
 
-        while (
-            order_rq.volume > Volume{0} 
-            && !levels.empty() 
-            && (order_rq.type == OrderType::MARKET || crosses_best_price(order_rq.price))
-        )
-        {
+        while (order_rq.volume > Volume{0} && !levels.empty() &&
+               (order_rq.type == OrderType::MARKET || crosses_best_price(order_rq.price))) {
             PriceLevel& best_level = levels.back();
             BookOrder& market_order = best_level.orders.front();
 
-            Volume trade_vol = consume(levels.back(), order_rq.volume);
+            Volume trade_vol = consume(best_level, order_rq.volume);
             trades.push_back(get_trade(best_level.price, trade_vol, order_rq.id));
             remove_if_filled(best_level);
         }
@@ -73,13 +67,12 @@ public:
 
         BookOrder new_order{order_rq.id, order_rq.volume};
 
-        auto rev_it = std::find_if(levels.rbegin(), levels.rend(),
-            [&](const PriceLevel& level) {
-                if constexpr (S == Side::BID)
-                    return level.price <= order_rq.price;
-                else
-                    return level.price >= order_rq.price;
-            });
+        auto rev_it = std::find_if(levels.rbegin(), levels.rend(), [&](const PriceLevel& level) {
+            if constexpr (S == Side::BID)
+                return level.price <= order_rq.price;
+            else
+                return level.price >= order_rq.price;
+        });
 
         if (rev_it != levels.rend() && rev_it->price == order_rq.price) {
             rev_it->orders.push_back(new_order);
@@ -87,7 +80,10 @@ public:
             return;
         }
 
-        levels.insert(rev_it.base(), PriceLevel{order_rq.price, order_rq.volume, OrderQueue{new_order}});
+        levels.insert(
+            rev_it.base(),
+            PriceLevel{order_rq.price, order_rq.volume, OrderQueue{new_order}}
+        );
     }
 
     void clear() noexcept { levels.clear(); }
@@ -109,16 +105,16 @@ private:
 
         if constexpr (S == Side::BID) {
             return Trade{
-                .price = price, 
-                .volume = volume, 
-                .buyer_id = market_order.id, 
+                .price = price,
+                .volume = volume,
+                .buyer_id = market_order.id,
                 .seller_id = taker_id
             };
         } else {
             return Trade{
-                .price = price, 
-                .volume = volume, 
-                .buyer_id = taker_id, 
+                .price = price,
+                .volume = volume,
+                .buyer_id = taker_id,
                 .seller_id = market_order.id
             };
         }
@@ -127,12 +123,9 @@ private:
     void remove_if_filled(PriceLevel& level) {
         if (level.orders.front().volume == Volume{0}) {
             level.orders.pop_front();
-            if (level.orders.empty())
-                levels.pop_back();
+            if (level.orders.empty()) levels.pop_back();
         }
     }
-
-
 };
 
 class OrderBook {
@@ -159,12 +152,14 @@ public:
 private:
     OrderDepth<Side::BID> bids_;
     OrderDepth<Side::ASK> asks_;
-    std::vector<Trade>    trades_;
+    std::vector<Trade> trades_;
 
     template<Side S>
     OrderDepth<S>& depth() {
-        if constexpr (S == Side::BID) return bids_;
-        else return asks_;
+        if constexpr (S == Side::BID)
+            return bids_;
+        else
+            return asks_;
     }
 
     template<Side S>

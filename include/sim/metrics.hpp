@@ -1,11 +1,13 @@
 #pragma once
-#include <concepts>
 #include <cmath>
+#include <concepts>
+
 #include "market_types.hpp"
+#include "primitives.hpp"
 
 template<typename T>
-concept Numeric = (std::floating_point<T> || std::integral<T>)
-                  && !std::same_as<T, bool> && !std::same_as<T, char>;
+concept Numeric = (std::floating_point<T> || std::integral<T>) && !std::same_as<T, bool> &&
+                  !std::same_as<T, char>;
 
 template<Numeric T>
 class Metric {
@@ -20,7 +22,8 @@ public:
         mean_ += delta1 / n;
 
         double delta2 = static_cast<double>(val) - mean_;
-        if (n > 1) {;
+        if (n > 1) {
+            ;
             var_ = ((n - 2) * var_ + delta1 * delta2) / (n - 1);
         }
     }
@@ -28,13 +31,12 @@ public:
     T total() const { return total_; }
     double mean() const { return mean_; }
     double variance() const { return var_; }
-    double std_dev() const {
-        return std::sqrt(variance());
-    }
+    double std_dev() const { return std::sqrt(variance()); }
+
 private:
     T total_ = T{};
     double mean_ = 0.0;
-    double var_ = 0.0; 
+    double var_ = 0.0;
     int n = 0;
 };
 
@@ -45,9 +47,7 @@ public:
         total += 1;
     }
 
-    double percentage() const {
-        return (total == 0) ? 0.0 : static_cast<double>(counts) / total;
-    }
+    double percentage() const { return (total == 0) ? 0.0 : static_cast<double>(counts) / total; }
     int count() const { return counts; }
 
 private:
@@ -64,11 +64,6 @@ public:
         if (count > 1) {
             double delta1 = pnl - mean_pnl;
             mean_pnl += delta1 / count;
-
-            double delta2 = pnl - mean_pnl;
-            if (count > 1) {;
-                var_pnl = ((count - 2) * var_pnl + delta1 * delta2) / (count - 1);
-            }
         }
         prev_profit = current_profit;
 
@@ -84,33 +79,24 @@ public:
         }
     }
 
-    double get_volatility() const {
-        return std::sqrt(var_pnl);
-    }
-
     double max() const {
-        double sigma = get_volatility();
-        if (sigma <= 1e-9) return 0.0; // Avoid division by zero/noise
-        return max_drawdown / sigma;
+        return max_drawdown;
     }
 
     double mean() const {
-        double sigma = get_volatility();
-        if (sigma <= 1e-9) return 0.0;
-        return mean_drawdown / sigma;
+        return mean_drawdown;
     }
 
 private:
     double peak_profit = 0.0;
     double max_drawdown = 0.0;
     double current_profit = 0.0;
-    
+
     int count = 0;
     double mean_drawdown = 0.0;
 
     double prev_profit = 0.0;
     double mean_pnl = 0.0;
-    double var_pnl = 0.0; 
 };
 
 struct SimulatorResults {
@@ -140,16 +126,23 @@ struct TickEndEvent {
     Position position;
 };
 
+struct OnTickStart {
+    Position position;
+    double price_change;
+};
+
 class MetricsCollector {
 public:
+    void on_tick_start(const OnTickStart& event) {
+        tick_pnl = event.price_change * event.position.value();
+    }
+
     Volume on_order_fills(const OrderFillEvent& event) {
-        Price expected_price = (event.type == OrderType::MARKET)? 
-            event.trades.front().price :
-            event.expected_price;
-        
+        Price expected_price =
+            (event.type == OrderType::MARKET) ? event.trades.front().price : event.expected_price;
+
         double total_cost = 0.0;
         Volume total_volume{0};
-        double tick_pnl = 0.0;
 
         for (const auto& trade : event.trades) {
             total_cost += trade.volume * trade.price;
@@ -160,25 +153,22 @@ public:
             } else {
                 tick_pnl += (price_to_double(trade.price) - event.sim_price) * trade.volume.value();
             }
+        }
 
+        if (total_volume != Volume{0}) {
             double vwap = total_cost / total_volume.value();
-            double slippage = (event.side == Side::BID)? 
-                vwap - price_to_double(expected_price) :
-                price_to_double(expected_price) - vwap;
-
+            double slippage = (event.side == Side::BID) ? vwap - price_to_double(expected_price)
+                                                        : price_to_double(expected_price) - vwap;
             results_.slippage.update(slippage);
         }
 
-        results_.makes.update(bool(total_volume == Volume{0})); 
+        results_.makes.update(bool(total_volume == Volume{0}));
         results_.takes.update(bool(total_volume != Volume{0}));
-        results_.pnl.update(tick_pnl);
-        results_.drawdown.update(tick_pnl);
         return total_volume;
     }
 
     Volume on_bot_trades(const BotFillEvent& event) {
         Volume total_volume{0};
-        double tick_pnl = 0.0;
 
         for (const auto& trade : event.bot_trades) {
             if (!(trade.buyer_id == config::USER_ID || trade.seller_id == config::USER_ID)) {
@@ -187,27 +177,29 @@ public:
 
             total_volume += trade.volume;
 
+            double unit_pnl{};
             if (trade.buyer_id == config::USER_ID) {
-                tick_pnl += (event.sim_price - price_to_double(trade.price)) * trade.volume.value();
-                results_.fill_quality.update(tick_pnl);
+                unit_pnl = event.sim_price - price_to_double(trade.price);
             } else if (trade.seller_id == config::USER_ID) {
-                tick_pnl += (price_to_double(trade.price) - event.sim_price) * trade.volume.value();
+                unit_pnl = price_to_double(trade.price) - event.sim_price;
             }
 
-            results_.fill_quality.update(tick_pnl);
+            tick_pnl += unit_pnl * trade.volume.value();
+            results_.fill_quality.update(unit_pnl);
         }
 
-        results_.pnl.update(tick_pnl);
-        results_.drawdown.update(tick_pnl);
         return total_volume;
     }
 
     void on_tick_end(const TickEndEvent& event) {
         results_.position.update(event.position.value());
+        results_.drawdown.update(tick_pnl);
+        results_.pnl.update(tick_pnl);
     }
 
     const SimulatorResults& results() const { return results_; }
 
 private:
     SimulatorResults results_;
+    double tick_pnl = 0.0;
 };

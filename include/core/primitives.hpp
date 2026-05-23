@@ -1,10 +1,10 @@
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
-#include <cmath>
-#include <limits>
 #include <exception>
+#include <limits>
 #include <source_location>
 
 using PriceUnderlying = uint32_t;
@@ -18,18 +18,28 @@ inline void hard_assert(
     const std::source_location loc = std::source_location::current()
 ) {
     if (!cond) [[unlikely]] {
-        std::fprintf(stderr, "FATAL [%s]: %s\nLocation: %s:%u\nFunction: %s\n",
-                     type, msg, loc.file_name(), loc.line(), loc.function_name());
+        std::fprintf(
+            stderr,
+            "FATAL [%s]: %s\nLocation: %s:%u\nFunction: %s\n",
+            type,
+            msg,
+            loc.file_name(),
+            loc.line(),
+            loc.function_name()
+        );
         std::terminate();
     }
 }
 
-struct TraderId  {
+struct TraderId {
 public:
     using Underlying = uint64_t;
-    constexpr explicit TraderId (Underlying v) : value(v) {}
+    constexpr TraderId() = default;
+    constexpr explicit TraderId(Underlying v)
+        : value(v) {}
     // Comparision
-    auto operator<=>(const TraderId &) const = default;
+    auto operator<=>(const TraderId&) const = default;
+
 private:
     Underlying value;
 };
@@ -37,7 +47,9 @@ private:
 class PriceDelta {
 public:
     using Underlying = int32_t;
-    explicit PriceDelta(Underlying v) : value_(v) {}
+    PriceDelta() = default;
+    explicit PriceDelta(Underlying v)
+        : value_(v) {}
     // Comparison
     auto operator<=>(const PriceDelta&) const = default;
     // Arithmetic
@@ -55,7 +67,8 @@ class Price {
 public:
     using Underlying = uint32_t;
     Price() = default;
-    explicit Price(Underlying v) : value_(v) {}
+    explicit Price(Underlying v)
+        : value_(v) {}
     // Comparision
     auto operator<=>(const Price&) const = default;
     // Arithmetic
@@ -67,8 +80,14 @@ public:
     }
     Price operator-(const PriceDelta& delta) const { return *this + -delta; }
 
-    Price& operator+=(const PriceDelta& delta) { *this = *this + delta; return *this; }
-    Price& operator-=(const PriceDelta& delta) { *this = *this - delta; return *this; }
+    Price& operator+=(const PriceDelta& delta) {
+        *this = *this + delta;
+        return *this;
+    }
+    Price& operator-=(const PriceDelta& delta) {
+        *this = *this - delta;
+        return *this;
+    }
     const Underlying value() const { return value_; }
 
 private:
@@ -79,15 +98,14 @@ inline Price convert_double_to_price(double sim_price) {
     return Price{static_cast<Price::Underlying>(std::round(sim_price))};
 }
 
-inline double price_to_double(Price price) {
-    return static_cast<double>(price.value());
-}
+inline double price_to_double(Price price) { return static_cast<double>(price.value()); }
 
 class Volume {
 public:
     using Underlying = uint32_t;
-
-    explicit Volume(Underlying v) : value_(v) {}
+    Volume() = default;
+    explicit Volume(Underlying v)
+        : value_(v) {}
     const Underlying value() const { return value_; }
 
     auto operator<=>(const Volume&) const = default;
@@ -104,11 +122,15 @@ public:
         return Volume{value_ - other.value()};
     }
 
-    Volume& operator+=(const Volume& other) { *this = *this + other; return *this; }
-    Volume& operator-=(const Volume& other) { *this = *this - other; return *this; }
-    double operator*(const double& price) const {
-        return static_cast<double>(value_) * price;
+    Volume& operator+=(const Volume& other) {
+        *this = *this + other;
+        return *this;
     }
+    Volume& operator-=(const Volume& other) {
+        *this = *this - other;
+        return *this;
+    }
+    double operator*(const double& price) const { return static_cast<double>(value_) * price; }
     double operator*(const Price& price) const {
         return static_cast<double>(value_) * price_to_double(price);
     }
@@ -121,7 +143,8 @@ class Position {
 public:
     using Underlying = int32_t;
     Position() = default;
-    explicit Position(Underlying v): value_(v) {}
+    explicit Position(Underlying v)
+        : value_(v) {}
     // Comparision
     auto operator<=>(const Position&) const = default;
     const Underlying value() const { return value_; }
@@ -136,8 +159,14 @@ public:
         return Position{static_cast<Underlying>(res)};
     }
 
-    Position& operator+=(const Volume& other) { *this = *this + other; return *this; }
-    Position& operator-=(const Volume& other) { *this = *this - other; return *this; }
+    Position& operator+=(const Volume& other) {
+        *this = *this + other;
+        return *this;
+    }
+    Position& operator-=(const Volume& other) {
+        *this = *this - other;
+        return *this;
+    }
 
 private:
     Underlying value_ = 0;
@@ -148,7 +177,10 @@ public:
     using Underlying = uint32_t;
 
     PositionLimit() = default;
-    constexpr explicit PositionLimit(Underlying v) : value_(v) {}
+    constexpr explicit PositionLimit(Underlying v)
+        : value_(v) {}
+
+    const Underlying value() const { return value_; }
 
     // Is the position within [-limit, +limit]
     bool contains(Position pos) const noexcept {
@@ -174,7 +206,8 @@ class Timestamp {
 public:
     using Underlying = Wide;
     Timestamp() = default;
-    explicit Timestamp(Underlying v) : value_(v) {}
+    explicit Timestamp(Underlying v)
+        : value_(v) {}
 
     auto operator<=>(const Timestamp&) const = default;
     Timestamp<TickSize>& operator++() {

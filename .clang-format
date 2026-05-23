@@ -1,0 +1,35 @@
+BasedOnStyle: Google
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+# Braces
+BreakBeforeBraces: Attach
+BraceWrapping:
+  AfterFunction: false
+
+# Function calls and definitions — break cleanly when they exceed column limit
+BinPackArguments: false
+BinPackParameters: false
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AlignAfterOpenBracket: BlockIndent
+AlwaysBreakAfterReturnType: None
+AlwaysBreakAfterDefinitionReturnType: None
+PenaltyReturnTypeOnItsOwnLine: 1000
+PenaltyBreakBeforeFirstCallParameter: 1
+
+# Templates
+SpaceAfterTemplateKeyword: false
+AlwaysBreakTemplateDeclarations: Yes
+
+# Class and struct
+BreakInheritanceList: BeforeColon
+BreakConstructorInitializers: BeforeColon
+PackConstructorInitializers: Never
+AccessModifierOffset: -4
+
+# General readability
+SortIncludes: CaseInsensitive
+SpacesInAngles: Never
+SpaceBeforeParens: ControlStatements

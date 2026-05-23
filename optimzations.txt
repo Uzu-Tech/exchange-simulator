@@ -1,0 +1,5 @@
+- Fast uniform
+- Removed dynamic allocation
+- Unintentional optional copying
+- Fixed arrays for orders in price levels
+- Compiler optimizations 

@@ -1,0 +1,39 @@
+simulation:
+  num_timestamps: 10000
+  seed: 18
+  position_limit: 100
+
+strategy:
+  type: PureMarketMaker
+  params:
+    offset: 1
+  
+price_model:
+  type: SimpleRandomWalk
+  params:
+    start_price: 10000
+    p: 0.5
+    step: 1
+
+makers:
+  - type: SymmetricMaker
+    count: 1
+    params:
+      half_spread: 10
+      min_volume: 10
+      max_volume: 30
+
+  - type: SymmetricMaker
+    count: 1
+    params:
+      half_spread: 9
+      min_volume: 1
+      max_volume: 10
+
+takers:
+  - type: RandomTaker
+    count: 1
+    params:
+      trade_prob: 0.05
+      min_volume: 1
+      max_volume: 10

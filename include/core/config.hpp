@@ -1,34 +1,63 @@
 #pragma once
 
-#include "primitives.hpp"
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <unordered_map>
 #include <variant>
-#include <string_view>
-#include <vector>
+#include <Yaml.hpp>
+
+#include "pcg_random.hpp"
+#include "primitives.hpp"
 
 namespace config {
-    inline constexpr uint64_t DEFAULT_RNG_SEED = 42; 
-    inline constexpr std::size_t  ORDER_BOOK_DEPTH = 16; // Max number of levels on each side
-    inline constexpr TraderId USER_ID{0}; // Max number of levels on each side
-    inline constexpr unsigned int TIMESTAMP_TICK_SIZE{100};
+inline constexpr uint64_t DEFAULT_RNG_SEED = 42;
+inline constexpr std::size_t INITIAL_ORDER_BOOK_DEPTH = 16;  // Initial number of levels on each side
+inline constexpr std::size_t MAX_ORDERS_PER_LEVEL = 8; // Max number of orders in one price level
+inline constexpr TraderId USER_ID{0};
+inline constexpr unsigned int TIMESTAMP_TICK_SIZE{100};
+}  // namespace config
+
+using SettingValue = std::variant<bool, int, double, std::string>;
+using Config = Yaml::Node;
+
+template<typename T>
+concept CustomType = requires { typename T::Underlying; };
+
+template<typename T>
+    requires(!CustomType<T>)
+T as_type(Config& node) {
+    return node.template As<T>();
 }
 
-using SettingValue = std::variant<bool, int, double, std::string_view>;
-using ConfigMap = std::unordered_map<std::string_view, SettingValue>;
-
-
-template<typename Ret, typename... Args, std::size_t... Is>
-Ret invoke_helper(
-    Ret(*func)(Args...), // function type: Ret type and Args deduced from this
-    const ConfigMap& config, // config from file or CLI
-    const std::vector<std::string_view>& keys, 
-    std::index_sequence<Is...>
-) {
-    // Unpacks the pack: get_value<Arg0>(config["key0"]), get_value<Arg1>(config["key1"])...
-    return func(std::get<Args>(config.at(keys[Is]))...);
+template<CustomType T>
+T as_type(Config& node) {
+    return T{node.template As<typename T::Underlying>()};
 }
 
-template<std::size_t N>
-using Indices = std::make_index_sequence<N>;
+class ConfigParser {
+public:
+    explicit ConfigParser(Config& node)
+        : m_node(node) {}
+
+    template<typename T>
+    ConfigParser& bind(std::string_view key, T& target) {
+        if (m_node[std::string(key)].IsNone()) {
+            throw std::runtime_error(
+                "Configuration error: Missing required key: " + std::string(key)
+            );
+        }
+
+        try {
+            target = as_type<T>(m_node[std::string(key)]);
+        } catch (const std::exception& e) {
+            throw std::runtime_error(
+                "Configuration error: Invalid value for key '" + std::string(key) + "': " + e.what()
+            );
+        }
+
+        return *this;
+    }
+
+private:
+    Config& m_node;
+};

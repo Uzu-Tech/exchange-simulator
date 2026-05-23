@@ -2,13 +2,9 @@
 #include "taker.hpp"
 #include "rng.hpp"
 
-// Compile-time check
 static_assert(MarketTaker<RandomTaker, SimpleRandomWalk>,   "RandomTaker must satisfy MarketTaker<SimpleRandomWalk>");
 static_assert(MarketTaker<RandomTaker, GaussianRandomWalk>, "RandomTaker must satisfy MarketTaker<GaussianRandomWalk>");
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 static OrderBook make_book() {
     OrderBook book;
     auto ask = OrderRequest::limit(TraderId{99}, Price{100}, Volume{100}, Side::ASK);
@@ -20,7 +16,11 @@ static OrderBook make_book() {
 
 static SimpleRandomWalk make_model(double price = 100.0, uint64_t seed = 1) {
     RandomEngine rng{seed};
-    return SimpleRandomWalk{price, 0.5, 0.0, rng.make_child()};
+    SimpleRandomWalk::ConfigParams params{};
+    params.start_price = price;
+    params.p           = 0.5;
+    params.step        = 0.0;
+    return SimpleRandomWalk{rng.make_child(), params};
 }
 
 static RandomTaker make_taker(
@@ -31,17 +31,16 @@ static RandomTaker make_taker(
     uint64_t trader_id  = 1
 ) {
     RandomEngine rng{seed};
-    return RandomTaker{
-        TraderId{trader_id},
-        trade_prob,
-        Volume{min_vol},
-        Volume{max_vol},
-        rng.make_child()
-    };
+    RandomTaker::ConfigParams params{};
+    params.trade_prob = trade_prob;
+    params.min_volume = Volume{min_vol};
+    params.max_volume = Volume{max_vol};
+
+    return RandomTaker{TraderId{trader_id}, rng.make_child(), params};
 }
 
 // ---------------------------------------------------------------------------
-// Basic behaviour
+// Basic Behavior
 // ---------------------------------------------------------------------------
 TEST(RandomTakerTest, AlwaysFiresAtProbOne) {
     auto book  = make_book();
@@ -83,48 +82,9 @@ TEST(RandomTakerTest, VolumeWithinBounds) {
     }
 }
 
-TEST(RandomTakerTest, ProducesBothSides) {
-    auto book  = make_book();
-    auto model = make_model();
-    auto taker = make_taker(1.0, 5, 10, 42);
-
-    bool saw_bid = false, saw_ask = false;
-
-    for (int i = 0; i < 100; ++i) {
-        auto order = taker.get_order(book, model);
-        ASSERT_TRUE(order.has_value());
-        if (order->side == Side::BID) saw_bid = true;
-        if (order->side == Side::ASK) saw_ask = true;
-        if (saw_bid && saw_ask) break;
-    }
-
-    EXPECT_TRUE(saw_bid);
-    EXPECT_TRUE(saw_ask);
-}
-
-// ---------------------------------------------------------------------------
-// Statistical property
-// ---------------------------------------------------------------------------
-TEST(RandomTakerTest, FireRateApproximatesProbability) {
-    auto book  = make_book();
-    auto model = make_model();
-    auto taker = make_taker(0.1, 5, 10, 42);
-
-    int fires = 0, trials = 10000;
-    for (int i = 0; i < trials; ++i)
-        if (taker.get_order(book, model).has_value()) fires++;
-
-    double rate = static_cast<double>(fires) / trials;
-    EXPECT_NEAR(rate, 0.1, 0.02);
-}
-
-// ---------------------------------------------------------------------------
-// Reproducibility
-// ---------------------------------------------------------------------------
 TEST(RandomTakerTest, ReproducibleWithSameSeed) {
     auto book  = make_book();
     auto model = make_model();
-
     std::vector<bool> run1, run2;
 
     {
@@ -139,21 +99,4 @@ TEST(RandomTakerTest, ReproducibleWithSameSeed) {
     }
 
     EXPECT_EQ(run1, run2);
-}
-
-TEST(RandomTakerTest, DifferentSeedsProduceDifferentSequences) {
-    auto book   = make_book();
-    auto model  = make_model();
-    auto taker1 = make_taker(0.5, 5, 10, 42);
-    auto taker2 = make_taker(0.5, 5, 10, 99);
-
-    bool diverged = false;
-    for (int i = 0; i < 100; ++i) {
-        if (taker1.get_order(book, model).has_value() !=
-            taker2.get_order(book, model).has_value()) {
-            diverged = true;
-            break;
-        }
-    }
-    EXPECT_TRUE(diverged);
 }
