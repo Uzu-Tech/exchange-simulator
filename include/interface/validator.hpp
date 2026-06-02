@@ -1,3 +1,5 @@
+#pragma once
+
 #include "config.hpp"
 
 namespace Validator {
@@ -12,14 +14,13 @@ inline void validate_config(Config& config) {
         return node;
     };
 
-    auto& sim_node = require(config, "simulation", "root");
     require(config, "price_model", "root");
     require(config, "strategy", "root");
     require(config, "makers", "root");
     require(config, "takers", "root");
 
-    auto& num_timestamps_node = require(sim_node, "num_timestamps", "simulation");
-    auto& pos_limit_node = require(sim_node, "position_limit", "simulation");
+    auto& num_ticks_node = require(config, "num_ticks", "root");
+    auto& pos_limit_node = require(config, "position_limit", "root");
 
     auto& model_node = config["price_model"];
     require(model_node, "params", "price_model");

@@ -11,6 +11,7 @@
 #include "primitives.hpp"
 #include "rng.hpp"
 #include "taker.hpp"
+#include "logger.hpp"
 
 template<typename Makers, typename Takers>
 class Simulator;
@@ -20,50 +21,48 @@ class Simulator<TypeList<Makers...>, TypeList<Takers...>> {
 public:
     Simulator(
         uint64_t seed,
-        size_t num_timestamps,
+        size_t num_ticks,
         PositionLimit limit,
         ActivePriceModel model,
         ActiveStrategy strategy,
         std::tuple<Makers...> makers,
-        std::tuple<Takers...> takers
+        std::tuple<Takers...> takers,
+        Logger* logger
     )
         : rng(seed),
           model(model),
           strategy(strategy),
           makers(makers),
           takers(takers),
-          num_timestamps_(num_timestamps),
-          position_limit_(limit) {}
+          num_ticks_(num_ticks),
+          position_limit_(limit),
+          logger(logger) {}
 
     SimulatorResults run() {
-        MetricsCollector collector;
+        MetricsCollector collector(logger);
         TradingState state{};
         std::vector<OrderRequest> strategy_orders{};
         strategy_orders.reserve(10);
 
-        for (size_t _ = 0; _ < num_timestamps_; _++) {
+        for (size_t _ = 0; _ < num_ticks_; _++) {
             collector.on_tick_start({state.position, model.price_change()});
-            fill_orderbook();
+            fill_orderbook(state.tick);
 
             strategy_orders.clear();
             strategy.get_orders(state, orderbook, position_limit_, strategy_orders);
             handle_strategy_order_requests(state.position, strategy_orders, collector);
             fill_bot_trades(state.position, collector);
-            collector.on_tick_end({state.position});
 
+            collector.on_tick_end({state.position});
             state.prev_trades = orderbook.trades();
 
             orderbook.clear();
             model.next_price();
-            ++state.timestamp;
+            ++state.tick;
         }
 
         return collector.results();
     }
-
-    uint64_t seed() const { return rng.seed(); }
-    size_t num_timestamps() const { return num_timestamps_; }
-    PositionLimit position_limit() const { return position_limit_; }
 
 private:
     RandomEngine rng;
@@ -75,23 +74,42 @@ private:
     std::tuple<Makers...> makers;
     std::tuple<Takers...> takers;
 
-    size_t num_timestamps_;
+    size_t num_ticks_;
     PositionLimit position_limit_;
 
-    void fill_orderbook() {
+    Logger* logger;
+
+    void fill_orderbook(Tick tick) {
         std::apply(
             [&](auto&... instances) {
                 (
                     [&](MarketMaker<ActivePriceModel> auto& maker) {
                         auto quote = maker.make_market(model);
-                        if (quote.ask) orderbook.add_order(*quote.ask);
-                        if (quote.bid) orderbook.add_order(*quote.bid);
+                        if (quote.ask) {
+                            orderbook.add_order(*quote.ask);
+                            if (logger) log_quote(*quote.ask, tick);
+                        }
+
+                        if (quote.bid) {
+                            orderbook.add_order(*quote.bid);
+                            if (logger) log_quote(*quote.bid, tick);
+                        }
                     }(instances),
                     ...
                 );  // Fold over the instances
             },
             makers
         );
+    }
+
+    void log_quote(const OrderRequest& order_rq, Tick tick) const {
+        logger->log_quote_data({
+            .tick = tick,
+            .id = order_rq.id,
+            .price = order_rq.price,
+            .volume = order_rq.volume,
+            .side = order_rq.side
+        });
     }
 
     void handle_strategy_order_requests(

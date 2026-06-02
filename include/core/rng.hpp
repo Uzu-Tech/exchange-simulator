@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sys/types.h>
 #include <limits>
 #include <cstdint>
 #include <pcg_random.hpp>
@@ -20,4 +21,8 @@ private:
 inline double fast_uniform(pcg32& gen) noexcept {
     return static_cast<double>(gen()) / 
            static_cast<double>(std::numeric_limits<uint32_t>::max());
+}
+
+inline uint64_t fast_seed(pcg32& gen) noexcept {
+    return static_cast<uint64_t>(gen());
 }

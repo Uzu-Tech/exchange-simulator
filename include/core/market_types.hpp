@@ -3,10 +3,10 @@
 #include <initializer_list>
 #include <span>
 
-#include "config.hpp"
+#include "settings.hpp"
 #include "primitives.hpp"
 
-enum class Side { BID, ASK };
+enum class Side : uint8_t { BID, ASK };
 
 struct Trade {
     Price price;
@@ -59,7 +59,7 @@ public:
     }
 
     void push_back(BookOrder order) {
-        hard_assert(size_ < config::MAX_ORDERS_PER_LEVEL, "OrderQueue", "Exceeded max orders per level");
+        hard_assert(size_ < settings::MAX_ORDERS_PER_LEVEL, "OrderQueue", "Exceeded max orders per level");
         queue_[size_++] = order;
     }
 
@@ -83,7 +83,7 @@ public:
     size_t size() const { return size_ - head; }
 
 private:
-    std::array<BookOrder, config::MAX_ORDERS_PER_LEVEL> queue_;
+    std::array<BookOrder, settings::MAX_ORDERS_PER_LEVEL> queue_;
     size_t head = 0;
     size_t size_ = 0;
 };
@@ -95,7 +95,7 @@ struct PriceLevel {
 };
 
 struct TradingState {
-    Timestamp<config::TIMESTAMP_TICK_SIZE> timestamp;
+    Tick tick;
     std::span<const Trade> prev_trades;
     Position position;
 };

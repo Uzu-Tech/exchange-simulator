@@ -37,7 +37,8 @@ static TestSim make_simulator(size_t num_ticks = 1000, uint64_t seed = 42) {
         SimpleRandomWalk{rng.make_child(), walk_params},
         PureMarketMaker{strat_params},
         std::make_tuple(SymmetricMaker{TraderId{1}, rng.make_child(), maker_params}),
-        std::make_tuple(RandomTaker{TraderId{2}, rng.make_child(), taker_params})
+        std::make_tuple(RandomTaker{TraderId{2}, rng.make_child(), taker_params}),
+        nullptr
     };
 }
 

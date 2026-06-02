@@ -9,7 +9,7 @@ static_assert(Strategy<PureMarketMaker>, "PureMarketMaker must satisfy Strategy"
 
 static TradingState make_state(int32_t position = 0) {
     return TradingState{
-        Timestamp<config::TIMESTAMP_TICK_SIZE>{0},
+        Tick{0},
         std::span<const Trade>{},
         Position{position}
     };

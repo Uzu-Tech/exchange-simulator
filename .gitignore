@@ -10,7 +10,7 @@ out/
 exch-sim
 
 # --- VS Code & IDEs ---
-.vscode/*
+.vscode/
 !.vscode/launch.json
 !.vscode/tasks.json
 !.vscode/settings.json
@@ -24,6 +24,15 @@ CMakeFiles/
 CMakeScripts/ ;
 cmake_install.cmake
 Makefile
+src/all_includes.cpp
 
 # --- Test Artifacts ---
 tests/build/
+
+# ---- Other ------
+*.py
+*.lock
+*.toml
+*.ipynb
+*.txt
+logs/

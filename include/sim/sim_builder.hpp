@@ -12,7 +12,7 @@
 #include "sim_price.hpp"
 #include "simulator.hpp"
 #include "taker.hpp"
-#include "validator.hpp"
+#include "sim_info.hpp"
 #include "Yaml.hpp"
 
 namespace SimBuilder {
@@ -94,23 +94,8 @@ std::tuple<Takers...> build_takers(
     );
 }
 
-inline Simulator<ActiveMakers, ActiveTakers> build_sim(Config& config) {
-    Validator::validate_config(config);
-
-    Config sim_node = config["simulation"];
-
-    uint64_t seed{};
-    if (!sim_node["seed"].IsNone()) {
-        seed = sim_node["seed"].As<uint64_t>();
-    } else {
-        pcg_extras::seed_seq_from<std::random_device> seed_source;
-        seed = pcg_extras::generate_one<uint64_t>(seed_source);
-    }
-
-    size_t num_timestamps = sim_node["num_timestamps"].As<size_t>();
-    PositionLimit position_limit = as_type<PositionLimit>(sim_node["position_limit"]);
-
-    RandomEngine root_rng{seed};
+inline Simulator<ActiveMakers, ActiveTakers> build_sim(SimInfo info, Config& config, Logger* logger = nullptr) {
+    RandomEngine root_rng{info.seed};
 
     Config model_node = config["price_model"];
     typename ActivePriceModel::ConfigParams model_params(model_node["params"]);
@@ -132,13 +117,14 @@ inline Simulator<ActiveMakers, ActiveTakers> build_sim(Config& config) {
 
     // 5. Construct and return the fully-wired simulator
     return Simulator<ActiveMakers, ActiveTakers>{
-        seed,
-        num_timestamps,
-        position_limit,
+        info.seed,
+        info.num_ticks,
+        info.position_limit,
         std::move(model),
         std::move(strategy),
         std::move(makers_tuple),
-        std::move(takers_tuple)
+        std::move(takers_tuple),
+        logger
     };
 }
 }  // namespace SimBuilder

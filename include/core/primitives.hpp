@@ -7,6 +7,8 @@
 #include <limits>
 #include <source_location>
 
+#include "settings.hpp"
+
 using PriceUnderlying = uint32_t;
 
 using Wide = int64_t;
@@ -201,17 +203,16 @@ private:
     Underlying value_;
 };
 
-template<unsigned int TickSize>
-class Timestamp {
+class Tick {
 public:
     using Underlying = Wide;
-    Timestamp() = default;
-    explicit Timestamp(Underlying v)
+    Tick() = default;
+    explicit Tick(Underlying v)
         : value_(v) {}
 
-    auto operator<=>(const Timestamp&) const = default;
-    Timestamp<TickSize>& operator++() {
-        value_ += static_cast<Underlying>(TickSize);
+    auto operator<=>(const Tick&) const = default;
+    Tick& operator++() {
+        value_ += settings::TICK_SIZE;
         return *this;
     }
 

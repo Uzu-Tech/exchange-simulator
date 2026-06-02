@@ -4,6 +4,8 @@
 
 #include "market_types.hpp"
 #include "primitives.hpp"
+#include "config.hpp"
+#include "logger.hpp"
 
 template<typename T>
 concept Numeric = (std::floating_point<T> || std::integral<T>) && !std::same_as<T, bool> &&
@@ -58,20 +60,14 @@ private:
 class DrawDown {
 public:
     void update(double pnl) {
-        current_profit = pnl;
+        current_equity += pnl;
         count++;
 
-        if (count > 1) {
-            double delta1 = pnl - mean_pnl;
-            mean_pnl += delta1 / count;
-        }
-        prev_profit = current_profit;
-
-        if (count == 1 || current_profit > peak_profit) {
-            peak_profit = current_profit;
+        if (count == 1 || current_equity > peak_equity) {
+            peak_equity = current_equity;
         }
 
-        double current_dd = peak_profit - current_profit;
+        double current_dd = peak_equity - current_equity;
         mean_drawdown += (current_dd - mean_drawdown) / count;
 
         if (current_dd > max_drawdown) {
@@ -88,14 +84,14 @@ public:
     }
 
 private:
-    double peak_profit = 0.0;
+    double peak_equity= 0.0;
     double max_drawdown = 0.0;
-    double current_profit = 0.0;
+    double current_equity= 0.0;
 
     int count = 0;
     double mean_drawdown = 0.0;
 
-    double prev_profit = 0.0;
+    double prev_equity = 0.0;
     double mean_pnl = 0.0;
 };
 
@@ -133,6 +129,9 @@ struct OnTickStart {
 
 class MetricsCollector {
 public:
+
+    MetricsCollector(Logger* logger) : logger(logger) {} 
+
     void on_tick_start(const OnTickStart& event) {
         tick_pnl = event.price_change * event.position.value();
     }
@@ -153,6 +152,8 @@ public:
             } else {
                 tick_pnl += (price_to_double(trade.price) - event.sim_price) * trade.volume.value();
             }
+
+            if (logger) log_trade(trade);
         }
 
         if (total_volume != Volume{0}) {
@@ -186,6 +187,8 @@ public:
 
             tick_pnl += unit_pnl * trade.volume.value();
             results_.fill_quality.update(unit_pnl);
+
+            if (logger) log_trade(trade);
         }
 
         return total_volume;
@@ -195,6 +198,18 @@ public:
         results_.position.update(event.position.value());
         results_.drawdown.update(tick_pnl);
         results_.pnl.update(tick_pnl);
+        if (logger) logger->log_performance_data({current_tick, tick_pnl, event.position});
+        ++current_tick;
+    }
+
+    void log_trade(const Trade& trade) {
+        logger->log_trade_data({
+            .tick = current_tick,
+            .buyer_id = trade.buyer_id,
+            .seller_id = trade.seller_id,
+            .price = trade.price,
+            .volume = trade.volume
+        });
     }
 
     const SimulatorResults& results() const { return results_; }
@@ -202,4 +217,6 @@ public:
 private:
     SimulatorResults results_;
     double tick_pnl = 0.0;
+    Logger* logger;
+    Tick current_tick{0};
 };

@@ -1,7 +1,8 @@
-simulation:
-  num_timestamps: 10000
-  seed: 18
-  position_limit: 100
+num_ticks: 10000
+seed: 
+position_limit: 100
+runs: 1
+log_dir: logs
 
 strategy:
   type: PureMarketMaker
@@ -26,7 +27,7 @@ makers:
   - type: SymmetricMaker
     count: 1
     params:
-      half_spread: 9
+      half_spread: 8
       min_volume: 1
       max_volume: 10
 

@@ -5,7 +5,7 @@
 #include <span>
 #include <vector>
 
-#include "config.hpp"
+#include "settings.hpp"
 #include "market_types.hpp"
 #include "primitives.hpp"
 
@@ -17,12 +17,12 @@ constexpr Side opposite() {
     else
         return Side::BID;
 }
-}  // namespace detail
+}
 
 template<Side S>
 class OrderDepth {
 public:
-    OrderDepth() { levels.reserve(config::INITIAL_ORDER_BOOK_DEPTH); }
+    OrderDepth() { levels.reserve(settings::INITIAL_ORDER_BOOK_DEPTH); }
 
     auto view() const noexcept { return levels | std::views::reverse; }
 
@@ -58,6 +58,8 @@ public:
             trades.push_back(get_trade(best_level.price, trade_vol, order_rq.id));
             remove_if_filled(best_level);
         }
+
+        hard_assert(trades.size() <= settings::MAX_TRADES_PER_SIDE, "Trade", "Max trade limit exceeded");
         // new trades
         return std::span<const Trade>(trades.begin() + prev_trade_size, trades.end());
     }
