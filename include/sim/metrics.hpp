@@ -99,6 +99,8 @@ struct SimulatorResults {
     Metric<double> pnl;
     CountMetric takes;
     CountMetric makes;
+    CountMetric fills;
+    Metric<double> fill_vol;
     Metric<double> fill_quality;
     Metric<double> slippage;
     Metric<int> position;
@@ -179,10 +181,11 @@ public:
             total_volume += trade.volume;
 
             double unit_pnl{};
-            if (trade.buyer_id == config::USER_ID) {
-                unit_pnl = event.sim_price - price_to_double(trade.price);
-            } else if (trade.seller_id == config::USER_ID) {
-                unit_pnl = price_to_double(trade.price) - event.sim_price;
+            if (trade.buyer_id == config::USER_ID || trade.seller_id == config::USER_ID) {
+                int sign = static_cast<int>(trade.buyer_id == config::USER_ID) * 2 - 1; // branchless calculation
+                unit_pnl = (event.sim_price - price_to_double(trade.price)) * sign;
+                results_.fills.update(true);
+                results_.fill_vol.update(trade.volume.value());
             }
 
             tick_pnl += unit_pnl * trade.volume.value();

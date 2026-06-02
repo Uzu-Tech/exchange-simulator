@@ -6,9 +6,10 @@
 
 #include "sim_info.hpp"
 #include "metrics.hpp"
+#include "logger.hpp"
 
 namespace Printer {
-inline void print_single_run_results(const SimulatorResults& r, const SimInfo& info) {
+inline void print_single_run_results(const SimulatorResults& r, const SimInfo& info, Logger* logger) {
     constexpr std::string_view GRN = "\033[32m";
     constexpr std::string_view RED = "\033[31m";
     constexpr std::string_view CYN = "\033[36m";
@@ -52,22 +53,32 @@ inline void print_single_run_results(const SimulatorResults& r, const SimInfo& i
         r.pnl.std_dev()
     );
 
+    // [Orders]
+    size_t num_ticks = info.num_ticks;
+    std::cout << std::format(
+        "{}{:<13}{:>10.2f}% | {:<13}{:>10.2f}%\n",
+        tag("[Orders]"),
+        "Take Rate:",
+        static_cast<double>(r.takes.count()) / 2 / num_ticks * 100.0,
+        "Make Rate:",
+        static_cast<double>(r.makes.count()) / 2 / num_ticks * 100.0
+    );
+
     // [Fills]
     std::cout << std::format(
-        "{}{:<14}{:>10} | {:<15}{:>9}  (Pct: {:>5.1f}%)\n",
+        "{}{:<13}{:>10.2f}% | {:<15}{:>9.2f}\n",
         tag("[Fills]"),
-        "Take Orders:",
-        r.takes.count(),
-        "Make Orders:",
-        r.makes.count(),
-        r.makes.percentage() * 100.0
+        "Fill Rate:",
+        static_cast<double>(r.fills.count()) / r.makes.count() * 100.0,
+        "Avg Fill Vol:",
+        r.fill_vol.mean()
     );
 
     // [Quality]
     std::cout << std::format(
         "{}{:<14}{:>10.4f} | {:<15}{:>9.2f}  (Std: {:>6.2f})\n",
         tag("[Quality]"),
-        "Slippage:",
+        "Avg Slippage:",
         r.slippage.mean(),
         "Fill Quality:",
         r.fill_quality.mean(),
@@ -78,7 +89,7 @@ inline void print_single_run_results(const SimulatorResults& r, const SimInfo& i
     std::cout << std::format(
         "{}{:<14}{:>10.2f} | {:<15}{}  (Mean:{:>8.2f})\n",
         tag("[Risk]"),
-        "Position:",
+        "Avg Position:",
         r.position.mean(),
         "Max Drawdown:",
         color(-r.drawdown.max(), std::format("{:>9.2f}", -r.drawdown.max())),
@@ -86,6 +97,15 @@ inline void print_single_run_results(const SimulatorResults& r, const SimInfo& i
     );
 
     std::cout << border;
+
+    if (logger) {
+        std::string run_dir = logger->get_run_dir();
+        
+        std::cout << std::format(
+            "{}{:<14}{}\n",
+            tag("[Storage]"), "Run Dir:", run_dir
+        );
+    }
 }
 }  // namespace Printer
 

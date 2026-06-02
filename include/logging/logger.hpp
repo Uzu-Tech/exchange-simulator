@@ -143,6 +143,7 @@ public:
     void log_performance_data(PerformanceLog log) { performance_file.write(log); }
     void log_quote_data(QuoteLog log) { quote_file.write(log); }
     void log_trade_data(TradeLog log) { trades_file.write(log); }
+    std::string get_run_dir() const { return run_dir.path.string(); }
 
 private:
     RunDirectory run_dir;

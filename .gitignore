@@ -35,4 +35,5 @@ tests/build/
 *.toml
 *.ipynb
 *.txt
+*.sh
 logs/

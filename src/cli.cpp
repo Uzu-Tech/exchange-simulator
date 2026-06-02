@@ -142,6 +142,7 @@ int run(int argc, char** argv) {
     size_t num_runs = 1;
     bool verbose = false;
     std::string log_dir{};
+    std::string clean_dir{};
 
     app.add_option("--num_ticks", num_ticks, "Number of ticks in single simulator run")
         ->check(CLI::PositiveNumber);
@@ -157,6 +158,7 @@ int run(int argc, char** argv) {
         ->check(CLI::PositiveNumber);
     app.add_flag("--verbose", verbose, "Print results for every individual run");
     app.add_option("--out", log_dir, "Directory to place the data for a run, saved as three binary .npy files");
+    app.add_flag("--clean_logs", log_dir, "Print results for every individual run");
 
     std::vector<std::string> overrides;
     app.add_option(

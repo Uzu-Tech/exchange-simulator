@@ -8,7 +8,7 @@
 void SimRunner::single_run(SimInfo info, Config& config, Logger* logger) {
     auto sim = SimBuilder::build_sim(info, config, logger);
     auto results = sim.run();
-    Printer::print_single_run_results(results, info);
+    Printer::print_single_run_results(results, info, logger);
 }
 
 void SimRunner::monte_carlo(const SimInfo& info, Config& config, size_t num_runs, bool verbose) {
