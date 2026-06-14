@@ -1,6 +1,9 @@
 #pragma once
+#include <atomic>
 #include <cmath>
 #include <concepts>
+#include <algorithm>
+#include <execution>
 
 #include "market_types.hpp"
 #include "primitives.hpp"
@@ -132,7 +135,7 @@ struct OnTickStart {
 class MetricsCollector {
 public:
 
-    MetricsCollector(Logger* logger) : logger(logger) {} 
+    MetricsCollector(SingleRunLogger* logger) : logger(logger) {} 
 
     void on_tick_start(const OnTickStart& event) {
         tick_pnl = event.price_change * event.position.value();
@@ -220,6 +223,124 @@ public:
 private:
     SimulatorResults results_;
     double tick_pnl = 0.0;
-    Logger* logger;
+    SingleRunLogger* logger;
     Tick current_tick{0};
+};
+
+struct MonteCarloResults {
+    size_t num_runs;
+    double pnl_mean;
+    double pnl_std;
+    double win_rate;
+
+    double pnl_5;
+    double pnl_50;
+    double pnl_95;
+
+    double c_var;
+    double mean_max_dd;
+    double skew;
+
+    double inventory_bias;
+    double avg_fill_rate;
+    double avg_slippage;
+};
+
+class MonteCarloCollector {
+public:
+    MonteCarloCollector(size_t num_runs) : pnl_per_run(num_runs) {}
+
+    void update(SimulatorResults results, size_t idx, uint64_t seed, MonteCarloLogger* logger) {
+        pnl_per_run[idx] = results.pnl.total();
+        max_dd_sum += results.drawdown.max();
+        position_sum += results.position.mean();
+        slippage_sum += results.slippage.mean();
+        fill_rate_sum += 2 * static_cast<double>(results.fills.count()) / results.makes.count();
+        if (logger) {
+            logger->log_monte_carlo_data({
+                .seed = seed,
+                .pnl = results.pnl.total(),
+                .max_dd = results.drawdown.max()
+            }, idx);
+        }
+    }
+
+    MonteCarloResults results() {
+        size_t num_runs = pnl_per_run.size();
+
+        auto [pnl_mean, pnl_std, pnl_skew, win_rate] = general_stats();
+
+        std::ranges::sort(pnl_per_run);
+        double pnl_5 = get_percentile(0.05);
+        double pnl_50 = get_percentile(0.5);
+        double pnl_95 = get_percentile(0.95);
+
+        double c_var = calculate_cvar(pnl_5);
+        double mean_max_dd = max_dd_sum / num_runs;
+
+        double inventory_bias = static_cast<double>(position_sum) / num_runs;
+        double avg_fill_rate = fill_rate_sum / num_runs;
+        double avg_slippage = slippage_sum / num_runs;
+
+        return MonteCarloResults{
+            num_runs, pnl_mean, pnl_std, win_rate,
+            pnl_5, pnl_50, pnl_95,
+            c_var, mean_max_dd, pnl_skew,
+            inventory_bias, avg_fill_rate, avg_slippage
+        };
+    }
+
+    std::tuple<double, double, double, double> general_stats() const {
+        double mean = 0;
+        double M2 = 0;
+        double M3 = 0;
+        double win_rate = 0;
+        int n = 0;
+
+        for (double pnl : pnl_per_run) {
+            n++;
+
+            if (pnl > 0) win_rate += 1.0 / pnl_per_run.size();
+
+            double delta = pnl - mean;
+            double delta_n = delta / n;
+            double delta_n2 = delta_n * delta_n;
+
+            M3 += delta * delta_n2 * (n - 1) * (n - 2) - 3 * delta_n * M2;
+            M2 += delta * (pnl - (mean + delta_n));
+            mean += delta_n;
+        }
+
+        double std = (n > 1)? sqrt(M2 / (n - 1)) : 0;
+        double skew = (n > 2)? (sqrt(n * (n - 1)) / (n - 2)) * (M3 / (n * pow(std, 3))) : 0;
+        return {mean, std, skew, win_rate};
+    }
+
+    double get_percentile(double percentile) {
+        if (pnl_per_run.empty()) return 0.0;
+
+        double rank = percentile * (pnl_per_run.size() - 1);
+        size_t lower = static_cast<size_t>(rank);
+        size_t upper = std::min(lower + 1, pnl_per_run.size() - 1);
+        double weight = rank - lower;
+
+        return pnl_per_run[lower] * (1.0 - weight) + pnl_per_run[upper] * weight;
+    }
+
+    double calculate_cvar(double percentile_value) {
+        if (pnl_per_run.empty()) return 0.0;
+
+        auto percentile_it = std::ranges::upper_bound(pnl_per_run, percentile_value);
+        auto count = std::ranges::distance(pnl_per_run.begin(), percentile_it);
+        if (count == 0) return 0.0;
+        auto sum = std::reduce(std::execution::par_unseq, pnl_per_run.begin(), percentile_it, 0.0);
+        return sum / count;
+    }
+
+private:
+    std::vector<double> pnl_per_run;
+    std::atomic<double> max_dd_sum;
+    std::atomic<int> position_sum;
+    std::atomic<double> slippage_sum;
+    std::atomic<double> fill_rate_sum;
 };

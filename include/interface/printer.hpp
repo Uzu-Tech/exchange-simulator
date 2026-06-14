@@ -9,7 +9,7 @@
 #include "logger.hpp"
 
 namespace Printer {
-inline void print_single_run_results(const SimulatorResults& r, const SimInfo& info, Logger* logger) {
+inline void print_single_run_results(const SimulatorResults& r, const SimInfo& info, SingleRunLogger* logger, size_t run_idx = 0) {
     constexpr std::string_view GRN = "\033[32m";
     constexpr std::string_view RED = "\033[31m";
     constexpr std::string_view CYN = "\033[36m";
@@ -26,8 +26,10 @@ inline void print_single_run_results(const SimulatorResults& r, const SimInfo& i
     constexpr int WIDTH = 82;
     std::string border = std::string(WIDTH, '=') + "\n";
 
+    std::string title = "Simulation Results" + ((run_idx != -1)? ": Run " + std::to_string(run_idx) : "");
+
     std::cout << border;
-    std::cout << std::format("{:^{}}\n", "Simulation Results", WIDTH);
+    std::cout << std::format("{:^{}}\n", title, WIDTH);
     std::cout << border;
 
     // [Config]
@@ -69,7 +71,7 @@ inline void print_single_run_results(const SimulatorResults& r, const SimInfo& i
         "{}{:<13}{:>10.2f}% | {:<15}{:>9.2f}\n",
         tag("[Fills]"),
         "Fill Rate:",
-        static_cast<double>(r.fills.count()) / r.makes.count() * 100.0,
+        2 * static_cast<double>(r.fills.count()) / r.makes.count() * 100.0,
         "Avg Fill Vol:",
         r.fill_vol.mean()
     );
@@ -106,6 +108,84 @@ inline void print_single_run_results(const SimulatorResults& r, const SimInfo& i
             tag("[Storage]"), "Run Dir:", run_dir
         );
     }
+}
+
+constexpr std::string_view get_tag(std::string_view t) {
+    return t; 
+}
+
+inline void print_monte_carlo_results(const MonteCarloResults& m, const SimInfo& info) {
+    constexpr std::string_view GRN = "\033[32m";
+    constexpr std::string_view RED = "\033[31m";
+    constexpr std::string_view CYN = "\033[36m";
+    constexpr std::string_view RST = "\033[0m";
+
+    auto color = [&](double v, const std::string& padded_str) {
+        if (v > 0) return std::format("{}{}{}", GRN, padded_str, RST);
+        if (v < 0) return std::format("{}{}{}", RED, padded_str, RST);
+        return padded_str;
+    };
+
+    auto tag  = [&](std::string_view t) { return std::format("{}{:<14}{}", CYN, t, RST); };
+    auto fmt  = [](double v)            { return std::format("{:>10.2f}", v); };
+    auto fmtp = [](double v)            { return std::format("{:>9.2f}%", v); };
+
+    constexpr int WIDTH = 100;
+    std::string border = std::string(WIDTH, '=') + "\n";
+
+    std::cout << border;
+    std::cout << std::format("{:^{}}\n", "Monte Carlo Summary", WIDTH);
+    std::cout << border;
+    
+    std::cout << std::format(
+        "{}{:<14}{:>12} | Num Runs:{:>5} | Seed:{:>4} | (Position Limit:{:>5})\n",
+        tag("[Config]"),
+        "Num Ticks:",
+        info.num_ticks,
+        m.num_runs,
+        info.seed % 10000,
+        info.position_limit.value()
+    );
+
+    std::cout << std::string(WIDTH, '-') + "\n";
+
+    // [PnL]
+    std::cout << std::format(
+        "{}{:<11}{} | {:<15}{} | {:<13}{}\n",
+        tag("[PnL]"),
+        "Mean PnL:",    color(m.pnl_mean, fmt(m.pnl_mean)),
+        "Std Dev:",     fmt(m.pnl_std),
+        "Win Rate:",    fmtp(m.win_rate * 100.0)
+    );
+
+    // [Distribution]
+    std::cout << std::format(
+        "{}{:<11}{} | {:<15}{} | {:<13}{}\n",
+        tag("[Dist]"),
+        "5th (VaR):",   color(m.pnl_5, fmt(m.pnl_5)),
+        "Median:",      color(m.pnl_50, fmt(m.pnl_50)),
+        "95th:",        color(m.pnl_95, fmt(m.pnl_95))
+    );
+
+    // [Risk]
+    std::cout << std::format(
+        "{}{:<11}{} | {:<15}{} | {:<13}{}\n",
+        tag("[Risk]"),
+        "CVaR:",        color(m.c_var,           fmt(m.c_var)),
+        "Mean Max DD:", color(-m.mean_max_dd,   fmt(-m.mean_max_dd)),
+        "Skewness:",    fmt(m.skew)
+    );
+
+    // [Operations]
+    std::cout << std::format(
+        "{}{:<11}{} | {:<15}{} | {:<13}{}\n",
+        tag("[General]"),
+        "Inv Bias:",    fmt(m.inventory_bias),
+        "Avg Slippage:", fmt(m.avg_slippage),
+        "Fill Rate:",   fmtp(m.avg_fill_rate * 100.0)
+    );
+
+    std::cout << border;
 }
 }  // namespace Printer
 

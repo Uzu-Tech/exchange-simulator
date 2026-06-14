@@ -27,7 +27,7 @@ public:
         ActiveStrategy strategy,
         std::tuple<Makers...> makers,
         std::tuple<Takers...> takers,
-        Logger* logger
+        SingleRunLogger* logger
     )
         : rng(seed),
           model(model),
@@ -64,6 +64,8 @@ public:
         return collector.results();
     }
 
+    uint64_t seed() const noexcept { return rng.seed(); }
+
 private:
     RandomEngine rng;
 
@@ -77,7 +79,7 @@ private:
     size_t num_ticks_;
     PositionLimit position_limit_;
 
-    Logger* logger;
+    SingleRunLogger* logger;
 
     void fill_orderbook(Tick tick) {
         std::apply(

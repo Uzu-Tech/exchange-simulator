@@ -188,9 +188,29 @@ int run(int argc, char** argv) {
         log_dir = as_type<std::string>(root["log_dir"]);
     }
 
-    std::unique_ptr<Logger> logger{};
+    std::unique_ptr<SingleRunLogger> single_logger{};
+    std::unique_ptr<MonteCarloLogger> mc_logger{};
     if (!log_dir.empty()) {
-        logger = std::make_unique<Logger>(fs::path(log_dir), fs::path(config_path), info.num_ticks);
+        // Patch root with the final resolved values so the saved config is fully reproducible
+        root["runs"] = std::to_string(num_runs);
+        root["log_dir"] = log_dir;
+        root["num_ticks"] = std::to_string(info.num_ticks);
+        root["seed"] = std::to_string(info.seed);
+        root["position_limit"] = std::to_string(info.position_limit.value());
+
+        // Now serialize and construct Logger
+        std::string config_contents;
+        Yaml::Serialize(root, config_contents);
+
+        if (num_runs >= 1) {
+            mc_logger = std::make_unique<MonteCarloLogger>(
+                fs::path(log_dir), config_contents, fs::path(config_path), num_runs
+            );
+        } else {
+            single_logger = std::make_unique<SingleRunLogger>(
+                fs::path(log_dir), config_contents, fs::path(config_path), info.num_ticks
+            );
+        }
     }
 
     for (const auto& kv : overrides) {
@@ -204,9 +224,9 @@ int run(int argc, char** argv) {
 
     try {
         if (num_runs > 1) {
-            SimRunner::monte_carlo(info, root, num_runs, verbose);
+            SimRunner::monte_carlo(info, root, num_runs, verbose, mc_logger.get());
         } else {
-            SimRunner::single_run(info, root, logger.get());
+            SimRunner::single_run(info, root, single_logger.get());
         }
 
     } catch (const std::exception& e) {

@@ -94,7 +94,7 @@ std::tuple<Takers...> build_takers(
     );
 }
 
-inline Simulator<ActiveMakers, ActiveTakers> build_sim(SimInfo info, Config& config, Logger* logger = nullptr) {
+inline Simulator<ActiveMakers, ActiveTakers> build_sim(SimInfo info, Config& config, SingleRunLogger* logger = nullptr) {
     RandomEngine root_rng{info.seed};
 
     Config model_node = config["price_model"];

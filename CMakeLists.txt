@@ -77,7 +77,11 @@ foreach(HEADER ${ALL_HEADERS})
 endforeach()
 
 # ── Main executable ───────────────────────────────────────────────────────────
-add_executable(exch-sim src/main.cpp src/cli.cpp src/sim_runner.cpp
+add_executable(
+    exch-sim 
+    src/main.cpp 
+    src/cli.cpp 
+    src/sim_runner.cpp
     src/all_includes.cpp)
 
 target_precompile_headers(exch-sim PRIVATE

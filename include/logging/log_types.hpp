@@ -62,4 +62,19 @@ struct TradeLog {
     }
 };
 
+
+struct MonteCarloLog {
+    uint64_t seed; 
+    double pnl;
+    double max_dd;
+
+    static constexpr auto npy_fields() {
+        return std::make_tuple(
+            std::make_pair("seed", NpyType<Tick::Underlying>::code),
+            std::make_pair("pnl", NpyType<double>::code),
+            std::make_pair("max_dd", NpyType<double>::code)
+        );
+    }
+};
+
 #pragma pack(pop)

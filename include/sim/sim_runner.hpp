@@ -4,11 +4,12 @@
 #include "logger.hpp"
 
 namespace SimRunner {
-    void single_run(SimInfo info, Config& config, Logger* logger);
+    void single_run(SimInfo info, Config& config, SingleRunLogger* logger);
     void monte_carlo(
         const SimInfo& info,
         Config& config,
         size_t num_runs,
-        bool verbose
+        bool verbose,
+        MonteCarloLogger* logger
     );
 }
