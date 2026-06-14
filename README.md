@@ -1,10 +1,10 @@
 # Exchange Simulator
 
-A high-performance market microstructure simulator built in modern C++20. Implements a complete electronic exchange with matching engine, order book management, pluggable agent-based market participants, and stochastic price models—all designed for zero-copy fast paths and compile-time composability.
+A high-performance market microstructure simulator built in modern C++20. Implements a complete electronic exchange with matching engine, order book management, pluggable agent-based market participants, and stochastic price models.
 
 ## Project Overview
 
-Exchange Simulator is a complete electronic market system written from scratch in C++. The core contribution is demonstrating how to build a highly extensible, high-performance system where any market participant (price model, maker/taker bot, user strategy) can be freely mixed and matched at compile time without performance compromise.
+Exchange Simulator is a complete electronic market system written from scratch in C++. The core contribution is demonstrating how to build a highly extensible, high-performance system where any market participant type (maker, taker, strategy) can be mixed with any other without code changes—all compiled to a single, specialized binary with zero runtime polymorphism overhead.
 
 ## Core Architecture
 
@@ -19,7 +19,7 @@ Exchange Simulator is a complete electronic market system written from scratch i
 
 ### Order Book Management
 
-Efficient depth tracking with automatic cleanup of empty price levels. Fast best-bid/best-ask queries and proper handling of partial fills. The book is rebuilt and snapshotted for metrics collection without disrupting the matching loop.
+Efficient depth tracking with automatic cleanup of empty price levels. Fast best-bid/best-ask queries and proper handling of partial fills. The book is rebuilt and snapshotted for metrics collection.
 
 ### Simulation Core Loop
 
@@ -50,7 +50,7 @@ concept MarketMaker = requires(T maker, OrderBook& book, P price) {
 };
 ```
 
-The framework ships with configurable maker implementations, but the key design point is that **new maker strategies can be added by implementing this concept**. Mix multiple different maker types in a single simulation—each with independent parameters and behavior.
+The framework ships with configurable maker implementations, but the key design point is that **new maker strategies can be added by implementing this concept**. Mix multiple different maker types in the same simulation.
 
 #### Taker Bots
 
@@ -122,11 +122,11 @@ You can combine:
 - Multiple different taker types
 - All of the above simultaneously
 
-Each combination compiles into a single, type-safe binary with **zero runtime polymorphism overhead**. No virtual functions, no branching on agent type—the compiler generates specialized code for your exact configuration.
+Each combination compiles into a single, type-safe binary with **zero runtime polymorphism overhead**. No virtual functions, no branching on agent type—the compiler generates specialized code for each type.
 
 ### Configuration & Wiring
 
-YAML configuration declares the market structure (how many of each agent type, their parameters). The `SimBuilder` pattern reads the config and constructs a fully wired `Simulator<ActiveMakers, ActiveTakers, ActiveStrategy, ActivePriceModel>` with all dependencies resolved:
+YAML configuration declares the market structure (how many of each agent type, their parameters). The `SimBuilder` pattern reads the config and constructs a fully wired `Simulator<ActiveMakers, ActiveTakers, ActiveStrategy, ActivePriceModel>`:
 
 ```cpp
 SimBuilder::build_sim(config_yaml, num_ticks, seed, position_limit)
@@ -153,7 +153,14 @@ class OrderQueue {
 };
 ```
 
-Every order queue is pre-allocated. Order placement never triggers dynamic memory allocation—critical for microsecond-level consistency.
+Every order queue is pre-allocated. Order placement never triggers dynamic memory allocation—critical for microsecond-level consistency. Fixed capacities can be tuned in `include/core/settings.hpp`:
+
+```cpp
+namespace settings {
+    inline constexpr std::size_t MAX_ORDERS_PER_LEVEL = 8;  // Adjust as needed
+    inline constexpr std::size_t MAX_TRADES_PER_SIDE = 8;   // Adjust for your workload
+};
+```
 
 **Template-Based Specialization Reduces Branching**
 
@@ -178,21 +185,22 @@ Standard library RNGs (`std::uniform_real_distribution`, `std::normal_distributi
 
 These custom implementations are integrated directly into agents and price models, eliminating wrapper overhead.
 
-**Multi-Threaded Monte Carlo**
+**Parallel Monte Carlo via `for_each`**
 
-Monte Carlo runs (1000+) are embarrassingly parallel—each run is independent. The simulator uses Intel TBB for automatic work distribution across all cores:
+Monte Carlo runs (1000+) are embarrassingly parallel—each run is independent. The simulator uses `std::execution::par` with `for_each` for automatic work distribution across all cores:
 
 ```cpp
-tbb::parallel_for(0, num_runs, [&](int run_idx) {
-    auto result = single_run(run_idx);  // Each core gets independent run
-});
+std::for_each(std::execution::par, runs.begin(), runs.end(),
+    [&](int run_idx) {
+        auto result = single_run(run_idx);  // Each core gets independent run
+    });
 ```
 
 Single-core runs dominate when num_runs < num_cores. Each core runs its own independent simulation without coordination.
 
 ### Benchmark
 
-- **10,000 Monte Carlo runs × 10,000 ticks per run = 100M market events in 1 second** (Release build, multi-core)
+- **10,000 Monte Carlo runs × 10,000 ticks per run = 100M market events in ~1 second** (Release build, multi-core)
 - Single-run 10,000-tick simulation: ~100 microseconds
 - Order matching: ~10 nanoseconds per fill (amortized)
 
@@ -202,11 +210,11 @@ This speed is achieved through:
 3. Fixed-capacity FIFO queues
 4. Compile-time polymorphism (no virtual dispatch)
 5. Template specialization for agent-specific logic
-6. Parallel Monte Carlo via TBB
+6. Parallel Monte Carlo via `std::execution::par`
 
 ### Memory Layout & Cache Efficiency
 
-Order log structures use `#pragma pack(1)` for tight packing, enabling direct serialization to NumPy binary format. Hot structures (OrderQueue, OrderBook best-bid/ask) are sized to fit L1 cache lines. Avoid cache misses in the critical path.
+Order log structures use `#pragma pack(1)` for tight packing, enabling direct serialization to NumPy binary format. Hot structures (OrderQueue, OrderBook best-bid/ask) are sized to fit L1 cache limits.
 
 ## Metrics & Analysis
 
@@ -230,20 +238,164 @@ Order log structures use `#pragma pack(1)` for tight packing, enabling direct se
 - `trades.npy`: tick, buyer_id, seller_id, price, volume per execution
 - `monte_carlo.npy`: seed, pnl, max_drawdown per run
 
+## Usage
+
+### Building the Simulator
+
+```bash
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+```
+
+### Configuration File
+
+Create or modify `config.yml` to define market structure:
+
+```yaml
+num_ticks: 10000
+seed: 8504
+position_limit: 100
+runs: 10000
+
+strategy:
+  type: PureMarketMaker
+  params:
+    offset: 1
+
+price_model:
+  type: SimpleRandomWalk
+  params:
+    start_price: 10000
+    p: 0.5
+    step: 1
+
+makers:
+  - type: SymmetricMaker
+    count: 1
+    params:
+      half_spread: 10
+      min_volume: 10
+      max_volume: 30
+  
+  - type: SymmetricMaker
+    count: 1
+    params:
+      half_spread: 8
+      min_volume: 1
+      max_volume: 10
+
+takers:
+  - type: RandomTaker
+    count: 1
+    params:
+      trade_prob: 0.05
+      min_volume: 1
+      max_volume: 10
+```
+
+**Config Parameters**:
+- `num_ticks`: Number of ticks per simulation run
+- `seed`: Random seed for reproducibility
+- `position_limit`: Max long/short position size for strategy
+- `runs`: Number of Monte Carlo runs (1 = single run, >1 = Monte Carlo mode)
+- `strategy`: Your trading algorithm and parameters
+- `price_model`: Stochastic price model (SimpleRandomWalk, GaussianRandomWalk, etc.)
+- `makers`: List of market maker types and counts
+- `takers`: List of market taker types and counts
+
+### Command Line Interface (CLI)
+
+#### Single Run
+
+```bash
+./build/exchange-simulator config.yml --ticks 10000 --seed 4612
+```
+
+**Output** (Single Run):
+```
+==================================================================================
+                            Simulation Results: Run 0                             
+==================================================================================
+[Config]    Num Ticks:           10000 | Seed: 4612 | (Position Limit:  100)
+----------------------------------------------------------------------------------
+[PnL]       Total PnL:      22152.00 | Mean PnL:           2.22  (Std:  70.12)
+[Orders]    Take Rate:         0.00% | Make Rate:        96.74%
+[Fills]     Fill Rate:         5.09% | Avg Fill Vol:       5.27
+[Quality]   Avg Slippage:     0.0000 | Fill Quality:       7.00  (Std:   0.00)
+[Risk]      Avg Position:      62.57 | Max Drawdown:   -3725.00  (Mean: -995.83)
+==================================================================================
+```
+
+#### Monte Carlo Simulation
+
+```bash
+./build/exchange-simulator config.yml --runs 10000 --ticks 10000 --seed 8504
+```
+
+**Output** (Monte Carlo):
+```
+====================================================================================================
+                                        Monte Carlo Summary                                         
+====================================================================================================
+[Config]      Num Ticks:           10000 | Num Runs:10000 | Seed:8504 | (Position Limit:  100)
+----------------------------------------------------------------------------------------------------
+[PnL]         Mean PnL:    18715.80 | Std Dev:          1020.61 | Win Rate:       100.00%
+[Dist]        5th (VaR):   17010.00 | Median:          18732.00 | 95th:          20377.00
+[Risk]        CVaR:        16580.52 | Mean Max DD:        -0.00 | Skewness:         -0.05
+[General]     Inv Bias:       -0.41 | Avg Slippage:        0.00 | Fill Rate:        5.00%
+====================================================================================================
+```
+
+#### Runtime Parameter Overrides
+
+Override config parameters without recompilation:
+
+```bash
+./build/exchange-simulator config.yml --set maker.0.half_spread=15 --set taker.0.trade_prob=0.1
+```
+
+#### Additional Options
+
+```bash
+./build/exchange-simulator config.yml --help
+```
+
+### Adjusting Fixed-Size Limits
+
+If you get capacity warnings or errors during simulation, adjust the settings in `include/core/settings.hpp`:
+
+```cpp
+namespace settings {
+    inline constexpr std::size_t INITIAL_ORDER_BOOK_DEPTH = 16;   // Order book levels
+    inline constexpr std::size_t MAX_ORDERS_PER_LEVEL = 8;        // Orders per price level
+    inline constexpr std::size_t MAX_TRADES_PER_SIDE = 8;         // Concurrent trades
+    inline constexpr std::size_t MAX_NUM_LOGS = 1e9;              // Total log entries
+};
+```
+
+Recompile after changes:
+
+```bash
+cd build
+cmake ..
+make -j$(nproc)
+```
+
 ## Build System
 
 **CMake 3.16+** with:
 - Precompiled headers for faster incremental builds
-- Automatic IntellISense file generation
+- Automatic IntelliSense file generation
 - Conditional test suite (Debug only)
 - ccache integration for CI performance
 - Release mode with `-O3 -march=native -mtune=native -flto`
 
 **Dependencies**:
-- Intel TBB (threading)
 - CLI11 (command-line parsing)
 - Embedded YAML parser
 - Embedded PCG random number generator
+- C++20 standard library features (Concepts, Ranges)
 
 ## Code Organization
 
@@ -253,7 +405,8 @@ include/
 │   ├── primitives.hpp
 │   ├── market_types.hpp
 │   ├── config.hpp
-│   └── active_types.hpp  # Compile-time composition
+│   ├── settings.hpp         # Fixed-size configuration
+│   └── active_types.hpp     # Compile-time composition
 ├── model/             # Stochastic price models
 │   └── sim_price.hpp
 ├── bots/              # Maker/taker agent implementations
@@ -300,11 +453,11 @@ Fail to implement the concept? Compilation error, not runtime surprise.
 
 ## Key Design Insights
 
-**Extensibility via Composition**: Add a new price model, maker, taker, or strategy by implementing a concept and updating one type alias. The entire system recompiles into a specialized binary. No runtime overhead, no plugin system complexity.
+**Extensibility via Composition**: Add a new price model, maker, taker, or strategy by implementing a concept and updating one type alias. The entire system recompiles into a specialized binary.
 
 **Performance Through Type Safety**: Compile-time polymorphism eliminates virtual dispatch, branches, and runtime type checking. You get the flexibility of plugins with the speed of monolithic code.
 
-**Zero-Copy Fast Paths**: Critical operations (order matching, tick iteration) allocate no memory. Fixed-size queues, stack-based order storage, and batch metrics collection ensure deterministic, microsecond-level latency.
+**Zero-Copy Fast Paths**: Critical operations (order matching, tick iteration) allocate no memory. Fixed-size queues, stack-based order storage, and batch metrics collection ensure deterministic, cache-efficient execution.
 
 **Reproducibility**: Deterministic RNG with seed control enables exact replay of any simulation. Same seed → identical fills, identical P&L. Essential for debugging and research.
 
