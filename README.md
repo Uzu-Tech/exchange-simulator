@@ -309,7 +309,7 @@ takers:
 #### Single Run
 
 ```bash
-./build/exchange-simulator config.yml --ticks 10000 --seed 4612
+./exch-sim --seed 4612
 ```
 
 **Output** (Single Run):
@@ -330,7 +330,7 @@ takers:
 #### Monte Carlo Simulation
 
 ```bash
-./build/exchange-simulator config.yml --runs 10000 --ticks 10000 --seed 8504
+./exch-sim --runs 10000 --seed 8504
 ```
 
 **Output** (Monte Carlo):
@@ -352,13 +352,13 @@ takers:
 Override config parameters without recompilation:
 
 ```bash
-./build/exchange-simulator config.yml --set maker.0.half_spread=15 --set taker.0.trade_prob=0.1
+./exch-sim --set maker.0.half_spread=15 taker.0.trade_prob=0.05
 ```
 
 #### Additional Options
 
 ```bash
-./build/exchange-simulator config.yml --help
+./exch-sim --help
 ```
 
 ### Adjusting Fixed-Size Limits
